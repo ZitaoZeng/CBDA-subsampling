@@ -1,0 +1,49 @@
+#!/bin/bash
+
+# CBDA validation and training set creation.
+
+# Create a test data set for testing and debugging of script
+# create-training-set.py.
+
+# The created file has a header line and rowCount data lines, each with
+# columnCount comma separated fields.
+#
+# The headers in the header line are of the form "hc" where "c" is the column
+# ordinal. If columnCount is 3 then the header line is "h1,h2,h3".
+#
+# The data items in the data lines are of the form "r.c" where r is the row
+# ordinal and c is the column ordinal. If columnCount is 3 then the first data
+# line is "2.1,2.2,2.3", since it is the 2nd line of the file, after the header
+# line. Similarly the 2nd data line is "3.1,3.2,3.3", etc.
+
+rowCount=${1?No row count specified}
+columnCount=${2?No column count specified}
+outFile=${3?No output file name specified}
+
+rm -f $outFile
+
+# Write header line.
+for (( c = 1; c <= $columnCount; ++c ))
+do
+	if (( c > 1 )); then
+		 echo -n "," >> $outFile
+	fi
+	echo -n "h$c" >> $outFile
+done
+echo >> $outFile
+
+# Write data lines.
+# Start at 2 since the first data line is the 2nd line of the file, after the
+# header line.
+for (( r = 2; r <= $rowCount+1; ++r ))
+do
+	# Write a data line.
+	for (( c = 1; c <= $columnCount; ++c ))
+	do
+		if (( c > 1 )); then
+			 echo -n "," >> $outFile
+		fi
+		echo -n "$r.$c" >> $outFile
+	done
+	echo >> $outFile
+done
