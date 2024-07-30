@@ -70,7 +70,7 @@ associated with another training set.
 
 
 There are 4 scripts in this part of the CBDA project, 3 Python3 scripts and 1
-bash script. For the python scripts use the "-h" command line option to see the
+bash script. For the Python scripts use the "-h" command line option to see the
 command line options for running the script.
 
 These scripts assume the original data file from which validation and training
@@ -78,9 +78,9 @@ sets are to be produced conforms to the following:
 
 Is a csv file with a header line that contains text labels for each column.
 
-There is column that contains a case id value.
+There is a column that contains a case id value.
 
-There is column that contains the outcome.
+There is a column that contains the outcome.
 
 All other columns are patient attributes.
 
@@ -101,7 +101,7 @@ number of lines in the file.
 list-original-file-info.py
 **************************
 
-Lists the contents of a Pickle file create by get-original-file-info.py to
+Lists the contents of a Pickle file created by get-original-file-info.py to
 standard output. Useful for testing and debugging the Python scripts.
 
 **************
