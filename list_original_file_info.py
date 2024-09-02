@@ -1,16 +1,22 @@
 #!/usr/bin/env python3
 
-# CBDA validation and training set creation.
+"""
+CBDA validation and training set creation.
 
-# This script lists the contents of the Pickle file containing the original
-# data file information.
+This script lists the contents of the Pickle file containing the original
+data file information.
+"""
 
 import sys
 import argparse
 import os
 import pickle
 
-def defineArgs(args=None):
+def define_args(cmd_line_args=None):
+
+    """
+    Get command line arguments.
+    """
 
     parser = argparse.ArgumentParser()
 
@@ -21,38 +27,40 @@ def defineArgs(args=None):
                         default=None, required=True)
 
 
-    args = parser.parse_args()
-    
+    cmd_line_args = parser.parse_args()
+
     # Check the arguments for validity.
-    
-    argsOk = True
 
-    if not os.path.isfile(args.originalDataFileInfo):
+    args_ok = True
+
+    if not os.path.isfile(cmd_line_args.originalDataFileInfo):
         msg = '\nValidation ordinal file "{0}" does not exist.\n'
-        msg = msg.format(args.originalDataFileInfo)
+        msg = msg.format(cmd_line_args.originalDataFileInfo)
         print(msg)
-        argsOk = False
+        args_ok = False
 
-    if not argsOk:
+    if not args_ok:
         sys.exit(1)
 
-    return args
+    return cmd_line_args
 
-def printArgs(args):
-    
+def print_args(cmd_line_args):
+
     """
     For testing and debugging.
     """
 
-    print('args.originalDataFileInfo: {0}'.format(args.originalDataFileInfo))
+    msg = 'cmd_line_args.originalDataFileInfo: {}'
+    print(msg.format(cmd_line_args.originalDataFileInfo))
 
-    print
+    # Blank line after all argument lines.
+    print('')
 
-args = defineArgs()
-#printArgs(args)
+args = define_args()
+#print_args(args)
 
 with open(args.originalDataFileInfo, 'rb') as odfiFile:
     (originalLineCount, originalColumnCount) = pickle.load(odfiFile)
 
-print('originalLineCount: {0}'.format(originalLineCount))
-print('originalColumnCount: {0}'.format(originalColumnCount))
+print(f'originalLineCount: {originalLineCount}')
+print(f'originalColumnCount: {originalColumnCount}')

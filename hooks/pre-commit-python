@@ -1,0 +1,76 @@
+#!/bin/bash
+
+# Taken from: https://gist.github.com/mattpolicastro/49104afc931d7c281eae That
+# was for linting R code. Changes were made to lint Python code, along with
+# other changes as noted.
+
+# Changed from using sh to Bash.
+# printf changed to echo.
+
+# --cached since we don't seem to have a new enough version of git for
+# --staged.
+# --diff-filter=ACM to only lint added, copied or modified files.
+staged=$(git diff --cached --name-only --diff-filter=ACM | grep ".py$")
+if [ "$staged" = '' ]; then
+	echo "Didn't find any staged Python files to lint."
+	exit 0
+fi
+
+echo "Linting staged Python files..."
+#echo $staged
+
+linter="pylint"
+which $linter > /dev/null
+result=$?
+if (( result != 0 )); then
+	echo "linter $linter not found. Make sure $linter is installed."
+	exit 1
+fi
+
+pass=true
+# run each staged file through the linter
+for file in ${staged}; do
+	# echo the staged file, not the file on disk, to a cache file.
+	# prevents the following:
+	# 1. stages file with linter failures
+	# 2. gets linter failure, fixes the file
+	# 3. doesn't re-stage fixes, tries to commit the bad original
+	# :${file} gets the contents of the file with just the changes
+	# that were staged. In https://git-scm.com/docs/gitrevisions
+	# see the descrption of:
+    # :[<n>:]<path>, e.g. :0:README, :README
+	echo "$(git show :${file})" > .lint_file.py
+
+	# run the linting script against the cache file
+	result=$($linter .lint_file.py)
+	resultCode=$?
+	#echo -e "\n$linter result $resultCode"
+
+	# Check if linter found anything
+	if (( resultCode != 0 )); then
+		echo
+		# write result to .lint_file.py
+		echo "$result" > .lint_file.py
+		# fix line references from .lint_file.py to source file
+		sed -i -e "s/\.lint_file.py/$file/g" .lint_file.py
+		echo "$linter found: ${file}"
+		cat .lint_file.py
+		pass=false
+	else
+		echo "$linter passed: ${file}"
+	fi
+done
+
+# remove the linter cache file
+rm .lint_file.py
+
+if ! $pass; then
+	echo
+	echo "Python linting failed for this commit."
+	echo "Make the corrections above, then re-stage."
+	exit 1
+else
+	echo
+	echo "Python linting passed for this commit."
+	exit 0
+fi

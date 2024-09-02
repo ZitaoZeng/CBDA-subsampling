@@ -2,6 +2,9 @@
 This project is a set of scripts for creating validation and training sets for
 the CBDA machine learning project.
 
+See the section "Programming Notes" at the end of this document on some
+important notes about making changes to the project source files.
+
 For a quick start see the examples at the end of this file.
 
 The idea is to use machine learning to examine patient data, including patient
@@ -38,7 +41,7 @@ randomly selected attributes out of 1,000 attributes per patient record.
 A training set might (and typically will) have some of the same patient records
 as one or more other training subsets, but it is unlikely two training subsets
 will have the exact same set of records. Similarly for the patient attributes -
-there might, and typicall will be, some overlap among different training sets,
+there might, and typically will be, some overlap among different training sets,
 but it is unlikely any 2 will have exactly the same attributes.
 
 However, it is desirable for none of the validation set records to be included
@@ -87,7 +90,7 @@ All other columns are patient attributes.
 The scripts are:
 
 *************************
-get-original-file-info.py
+get_original_file_info.py
 *************************
 
 This script reads the original data file and writes a Python Pickle file that
@@ -98,18 +101,18 @@ This requires one complete pass of the original data file, to determine the
 number of lines in the file.
 
 **************************
-list-original-file-info.py
+list_original_file_info.py
 **************************
 
-Lists the contents of a Pickle file created by get-original-file-info.py to
+Lists the contents of a Pickle file created by get_original_file_info.py to
 standard output. Useful for testing and debugging the Python scripts.
 
 **************
-create-sets.py
+create_sets.py
 **************
 
 This creates the validation set(s) and training sets. It reads the Pickle file
-prodcued by get-original-file-info.py and the original data file.  It uses
+prodcued by get_original_file_info.py and the original data file.  It uses
 command line options for the number of rows and columns to include in each
 validation and training set, the column ordinals for the case number and
 outcome columns and the number of training sets to produce.
@@ -151,10 +154,10 @@ validation-set.pickle:
 
 	A Python Pickle file with the ValidationSet object used to create files
 	validation-set and validation-set-row-ordinals. This is needed if script
-	create-sets.py needs to be run more than once if the number of training
+	create_sets.py needs to be run more than once if the number of training
 	sets to create exceeds the maximum number of open files allowed.
 
-	The first run of create-sets.py will create the validation files.
+	The first run of create_sets.py will create the validation files.
 	Subsequent runs for a given original file will read this Pickle file to
 	avoid recreating them again. This is not only, or primarily, an effciency
 	issue. This is to use a single set of validation row ordinals that are not
@@ -214,10 +217,10 @@ There is no file for training set column ordinals, because for Option 2 a
 training set uses the same columns as its validation set.
 
 ********************
-create-test-data-set
+create_test_data_set
 ********************
 
-This created a test data set, including a header line, with command line
+This creates a test data set, including a header line, with command line
 options for specifying the number of rows and number of columns.
 
 Each value in a field contains the row number and column number (except for the
@@ -250,7 +253,7 @@ These use the above test file.
 
 They assume the scripts are in the command search path.
 
-See the description above of script create-sets.py for a description of the
+See the description above of script create_sets.py for a description of the
 contents of the files produced.
 
 ****************
@@ -263,7 +266,7 @@ This produces file:
 
 odfi.pickle: Has the line count and column count of test-dataset.csv.
 
-create-sets.py -i test-dataset.csv --odfi odfi.pickle --trc 2 --vrc 4 --cc 4 --cn 1 --oc 2 --tsc 4
+create_sets.py -i test-dataset.csv --odfi odfi.pickle --trc 2 --vrc 4 --cc 4 --cn 1 --oc 2 --tsc 4
 
 training-set-1
 training-set-1-column-ordinals
@@ -295,7 +298,7 @@ This produces file:
 
 odfi.pickle: Has the line count and column count of test-dataset.csv.
 
-create-sets.py -i test-dataset.csv --odfi odfi.pickle --trc 2 --vrc 4 --cc 4 --cn 1 --oc 2 --tsc 4 --mvs
+create_sets.py -i test-dataset.csv --odfi odfi.pickle --trc 2 --vrc 4 --cc 4 --cn 1 --oc 2 --tsc 4 --mvs
 
 --mvs means multiple validation sets (i.e. Option 2).
 
@@ -329,3 +332,29 @@ validation-set-4
 validation-set-4-column-ordinals
 validation-set-4-row-ordinals
 
+*****************
+Programming Notes
+*****************
+
+This project has had a git pre-commit hook added. The files which implement
+this are in subdirectory hooks.
+
+Script hooks/pre-commit runs hooks/pre-commit-sample-modified and then runs
+hooks/pre-commit-python.
+
+hooks/pre-commit-sample-modified is a modified copy of the sample pre-commit
+hook that git put into .git/hooks. The modifications are noted in this file.
+It checks the files being committed for names that have non-ascii characters and
+for whitespace issues - trailing whitespace on a line or blank lines at the end
+of a file. It aborts the commit if there are any violations of these
+conditions.
+
+hooks/pre-commit-python runs each file being committed that is a Python script
+through the pylint program, which checks a file for coformance to the Python
+Pep8 code standard. Any violations abort the commit.
+
+To enable the pre-commit hook, after cloning the repository run the command
+hooks/setup-hooks. This will update .git/config to use directory hooks as the
+location for hooks to run, instead of .git/hooks. This allows versioning the
+hooks along with the main code and for easily sharing them with anyone that
+clones the repository.

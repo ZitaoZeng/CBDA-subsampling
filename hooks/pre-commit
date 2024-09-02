@@ -1,0 +1,15 @@
+#!/bin/bash
+
+hooks/pre-commit-sample-modified
+result=$?
+if (( result != 0 )); then
+	echo "pre-commit-sample-modified failed"
+	exit $result
+fi
+
+hooks/pre-commit-python
+result=$?
+if (( result != 0 )); then
+	echo "pre-commit-python failed"
+	exit $result
+fi

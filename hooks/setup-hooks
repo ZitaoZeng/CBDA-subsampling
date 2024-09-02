@@ -1,0 +1,5 @@
+#!/bin/bash
+
+# Run this script to setup the Git hooks to run from the project hooks
+# directory.
+git config --local core.hooksPath hooks
