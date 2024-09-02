@@ -699,7 +699,6 @@ def get_column_set(original_column_count, args):
 
             column_set.add(column)
 
-    print(column_set)
     return column_set
 
 def create_selection_sets(original_line_count, original_column_count, args, \
