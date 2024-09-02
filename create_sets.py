@@ -690,8 +690,16 @@ def get_column_set(original_column_count, args):
                 print(msg)
                 sys.exit(1)
 
+            if column in column_set:
+                msg = 'Column "{0}" from line {1}'
+                msg += ' already appeared in file {2}.'
+                msg = msg.format(fields[0], ordinal, args.column_set_file_name)
+                print(msg)
+                sys.exit(1)
+
             column_set.add(column)
 
+    print(column_set)
     return column_set
 
 def create_selection_sets(original_line_count, original_column_count, args, \
