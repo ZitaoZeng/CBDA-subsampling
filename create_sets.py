@@ -279,7 +279,7 @@ class ValidationSet(SelectionSet):
         # file object (or perhaps any file object) can't be pickled.
         if save:
             save_file_name = self.file_name + '.pickle'
-            with open(save_file_name, 'wb', encoding='utf_8') as save_file:
+            with open(save_file_name, 'wb') as save_file:
                 pickle.dump(self, save_file)
 
         self.open_set_file()
@@ -641,6 +641,8 @@ def get_column_set(original_column_count, args):
         However, this is not checked by this script.
 
     Only the requested number of columns to use (args.column_count) are read.
+
+    At this time only the column ordinal field is read.
     """
 
     column_set = set()
@@ -656,7 +658,7 @@ def get_column_set(original_column_count, args):
             fields = line.rstrip('\n').split(',')
 
             try:
-                column = int(fields[1])
+                column = int(fields[0])
             except ValueError:
                 msg = 'Column "{0}" from line {1} of file {2} is not an'
                 msg += ' integer.'
