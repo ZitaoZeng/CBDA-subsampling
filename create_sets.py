@@ -128,8 +128,18 @@ class SelectionSet:
         row_ordinals: A Python set object that has the row ordinals of the rows
                       (lines) of the original file to be written for this set.
 
+        column_ordinals: A list of the randomly selected columns to write from
+                         a line of the original file. It does not include the
+                         case number column or the output column.
+
         output_columns: A list of the columns to write from a line of the
-                        original file.
+                        original file. It is the output_ordinal columns plus
+                        the case number and output columns. The case number is
+                        the first column, the output column is the second
+                        column followed by the column_ordinals. The
+                        column_ordinals are sorted in ascending order when
+                        appended to output_columns, so they are in the same
+                        order as in the original file.
 
         set_file: An open file object to write the selected data to.
 
@@ -137,8 +147,25 @@ class SelectionSet:
 
     def __init__(self):
         self.row_ordinals = set()
+        self.column_ordinals = None
         self.output_columns = None
         self.set_file = None
+
+    def define_output_columns(self, args):
+
+        """
+        For writing the selected columns in the same order as they are in the
+        original file. Also, to include the case number and output columns in
+        the output, as the first and second columns.
+        """
+
+        column_ordinals_sorted = list(self.column_ordinals)
+        column_ordinals_sorted.sort()
+
+        self.output_columns = []
+        self.output_columns.append(args.case_column)
+        self.output_columns.append(args.outcome_column)
+        self.output_columns += column_ordinals_sorted
 
     def get_random_ordinals(self, count, end):
 
@@ -300,19 +327,6 @@ class ValidationSet(SelectionSet):
 
         self.open_set_file()
 
-    def define_output_columns(self, args):
-
-        """
-        For writing the selected columns in the same order as they are in the
-        original file. Also, to include the case number and output columns in
-        the output.
-        """
-
-        self.output_columns = list(self.column_ordinals)
-        self.output_columns.append(args.case_column)
-        self.output_columns.append(args.outcome_column)
-        self.output_columns.sort()
-
     def open_set_file(self):
         """
         Open the set's output file.
@@ -381,13 +395,7 @@ class TrainingSet(SelectionSet):
                                 args.training_row_count, 2, original_line_count, \
                                 exclude_validation_set.row_ordinals)
 
-        # For writing the selected columns in the same order as they are in the
-        # original file. Also, to include the case number and output columns in
-        # the output.
-        self.output_columns = list(self.column_ordinals)
-        self.output_columns.append(args.case_column)
-        self.output_columns.append(args.outcome_column)
-        self.output_columns.sort()
+        self.define_output_columns(args)
 
         self.file_name = f'training-set-{trainingOrdinal}'
 

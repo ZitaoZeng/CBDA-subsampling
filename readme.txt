@@ -87,6 +87,17 @@ There is a column that contains the outcome.
 
 All other columns are patient attributes.
 
+The original file may be placed in a zip file archive. The scripts that read
+the original data file can read either a plain text version of the file or
+the zip file.
+
+If a zip file is specified, the following assumptions are made:
+   There is only one file in the file archive.
+
+   The name of the file in the file archive is the same as the
+   name of the zip file, except it has no path and it ends with
+   '.csv' instead of '.zip'.
+
 The scripts are:
 
 *************************
@@ -172,6 +183,11 @@ training-set-i:
 	The training set data, the randomly selected row and columns (plus the case
 	number and outcome column). Ex. training-set-1, training-set-2, etc.
 
+    The first column is the case number column.
+    The second column is the outcome column.
+    The remaining columns are the randomly selected columns, in the order they
+    appear in the original file.
+
 training-set-i-row-ordinals:
 
 	The	row ordinals for the rows in the training set data.  This may be needed
@@ -192,6 +208,11 @@ validation-set-i:
 	The validation set data, the randomly selected row and columns (plus the case
 	number and outcome column). Ex. validation-set-1, validation-set-2, etc.
 
+    The first column is the case number column.
+    The second column is the outcome column.
+    The remaining columns are the randomly selected columns, in the order they
+    appear in the original file.
+
 validation-set-i-row-ordinals:
 
 	The	row ordinals for the rows in the validation set data.  This may be needed
@@ -209,6 +230,11 @@ training-set-i:
 
 	The training set data, the randomly selected row and columns (plus the case
 	number and outcome column). Ex. training-set-1, training-set-2, etc.
+
+    The first column is the case number column.
+    The second column is the outcome column.
+    The remaining columns are the randomly selected columns, in the order they
+    appear in the original file.
 
 training-set-i-row-ordinals:
 
