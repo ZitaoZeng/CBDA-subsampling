@@ -7,12 +7,27 @@ This script defines validation and training sets for a CBDA project.
 
 Inputs:
     File name of original data file.
-        The following assumptions are made about the contents of the file:
+
+        This may be a zip file or a plain text csv file.
+
+        If a zip file is specified, the following assumptions are made:
+           There is only one file in the file archive.
+
+           The name of the file in the file archive is the same as the
+           name of the zip file, except it has no path and it ends with
+           '.csv' instead of '.zip'.
+
+           The contents file in the file archive conform to the same
+           format as a file read directly from disk, described next.
+
+        The following assumptions are made about the contents of the actual
+        data file, whether read from a zip file or directly from a regular
+        file:
             It is a text file.
 
             It has a header line with column names.
 
-            It is a csv file.
+            It is a csv file/
 
             All lines have the same number of columns, including the header
             line.
@@ -100,6 +115,7 @@ import argparse
 import os
 import pickle
 import random
+import zipfile
 
 class SelectionSet:
 
@@ -409,7 +425,7 @@ class TrainingSet(SelectionSet):
 
         super().check_line(ordinal, fields)
 
-def define_and_get_args(cmd_args=None):
+def define_and_get_args(args=None):
 
     """
     Define and get the command line options.
@@ -471,11 +487,11 @@ def define_and_get_args(cmd_args=None):
     parser.add_argument('--cs', '--column-set', dest='column_set_file_name', \
                         help=msg, type=str, default=None, required=False)
 
-    cmd_args = parser.parse_args()
-    return cmd_args
+    args = parser.parse_args()
+    return args
 
 # pylint: disable-next=too-many-statements
-def check_args(cmd_args=None):
+def check_args(args=None):
 
     """
     Perform validity checks on the command line arguments.
@@ -483,108 +499,108 @@ def check_args(cmd_args=None):
 
     args_ok = True
 
-    if not os.path.isfile(cmd_args.original_file_name):
+    if not os.path.isfile(args.original_file_name):
         msg = '\nOriginal data set file "{0}" does not exist.\n'
-        msg = msg.format(cmd_args.original_file_name)
+        msg = msg.format(args.original_file_name)
         print(msg)
         args_ok = False
 
-    if not os.path.isfile(cmd_args.original_data_file_info):
+    if not os.path.isfile(args.original_data_file_info):
         msg = '\nValidation ordinal file "{0}" does not exist.\n'
-        msg = msg.format(cmd_args.original_data_file_info)
+        msg = msg.format(args.original_data_file_info)
         print(msg)
         args_ok = False
 
-    if cmd_args.training_row_count < 1:
+    if args.training_row_count < 1:
         msg = 'The training row count, {0}, is less than 1.'
-        msg = msg.format(cmd_args.training_row_count)
+        msg = msg.format(args.training_row_count)
         print(msg)
         args_ok = False
 
-    if cmd_args.validation_row_count < 1:
+    if args.validation_row_count < 1:
         msg = 'The validation row count, {0}, is less than 1.'
-        msg = msg.format(cmd_args.validation_row_count)
+        msg = msg.format(args.validation_row_count)
         print(msg)
         args_ok = False
 
-    if cmd_args.column_count < 1:
+    if args.column_count < 1:
         msg = 'The column count, {0}, is less than 1.'
-        msg = msg.format(cmd_args.column_count)
+        msg = msg.format(args.column_count)
         print(msg)
         args_ok = False
 
-    if cmd_args.case_column < 1:
+    if args.case_column < 1:
         msg = 'The case number column ordinal, {0}, is less than 1.'
-        msg = msg.format(cmd_args.case_column)
+        msg = msg.format(args.case_column)
         print(msg)
         args_ok = False
 
-    if cmd_args.outcome_column < 1:
+    if args.outcome_column < 1:
         msg = 'The outcome column ordinal, {0}, is less than 1.'
-        msg = msg.format(cmd_args.outcome_column)
+        msg = msg.format(args.outcome_column)
         print(msg)
         args_ok = False
 
-    if cmd_args.case_column == cmd_args.outcome_column:
+    if args.case_column == args.outcome_column:
         msg = 'The case number column ordinal and outcome column are the'
         msg += ' same, {0}'
-        msg = msg.format(cmd_args.case_column)
+        msg = msg.format(args.case_column)
         print(msg)
         args_ok = False
 
-    if cmd_args.starting_set_number < 1:
+    if args.starting_set_number < 1:
         msg = 'The starting_set_number, {0}, is less than 1.'
-        msg = msg.format(cmd_args.starting_set_number)
+        msg = msg.format(args.starting_set_number)
         print(msg)
         args_ok = False
 
-    if cmd_args.column_set_file_name is not None and \
-       not os.path.isfile(cmd_args.column_set_file_name):
+    if args.column_set_file_name is not None and \
+       not os.path.isfile(args.column_set_file_name):
         msg = '\nColumn set file "{0}" does not exist.\n'
-        msg = msg.format(cmd_args.column_set_file_name)
+        msg = msg.format(args.column_set_file_name)
         print(msg)
         args_ok = False
 
     if not args_ok:
         sys.exit(1)
 
-    return cmd_args
+    return args
 
-def define_and_check_args(cmd_args=None):
+def define_and_check_args(args=None):
 
     """
     Define, get and check the command line options.
     """
-    args = define_and_get_args(cmd_args)
+    args = define_and_get_args(args)
     check_args(args)
     return args
 
-def print_args(cmd_args):
+def print_args(args):
 
     """
     For testing and debugging.
     """
 
-    print(f'cmd_args.original_file_name: {cmd_args.original_file_name}')
+    print(f'args.original_file_name: {args.original_file_name}')
 
-    msg = 'cmd_args.original_data_file_info: {0}'
-    print(msg.format(cmd_args.original_data_file_info))
+    msg = 'args.original_data_file_info: {0}'
+    print(msg.format(args.original_data_file_info))
 
-    print(f'cmd_args.training_row_count: {cmd_args.training_row_count}')
+    print(f'args.training_row_count: {args.training_row_count}')
 
-    msg = 'cmd_args.validation_row_count: {0}'
-    print(msg.format(cmd_args.validation_row_count))
+    msg = 'args.validation_row_count: {0}'
+    print(msg.format(args.validation_row_count))
 
-    print(f'cmd_args.column_count: {cmd_args.column_count}')
-    print(f'cmd_args.case_column: {cmd_args.case_column}')
-    print(f'cmd_args.outcome_column: {cmd_args.outcome_column}')
+    print(f'args.column_count: {args.column_count}')
+    print(f'args.case_column: {args.case_column}')
+    print(f'args.outcome_column: {args.outcome_column}')
 
-    msg = 'cmd_args.multiple_validation_set: {0}'
-    print(msg.format(cmd_args.multiple_validation_set))
+    msg = 'args.multiple_validation_set: {0}'
+    print(msg.format(args.multiple_validation_set))
 
-    print(f'cmd_args.training_set_count: {cmd_args.training_set_count}')
-    print(f'cmd_args.starting_set_number: {cmd_args.starting_set_number}')
-    print(f'cmd_args.column_set_file_name: {cmd_args.column_set_file_name}')
+    print(f'args.training_set_count: {args.training_set_count}')
+    print(f'args.starting_set_number: {args.starting_set_number}')
+    print(f'args.column_set_file_name: {args.column_set_file_name}')
 
     print('')
 
@@ -764,6 +780,97 @@ def create_selection_sets(original_line_count, original_column_count, args, \
     print('...Done')
     return selection_sets
 
+def process_original_file(input_file, selection_sets):
+
+    """
+
+    Process each line from input_file.
+
+    input_file is an open file object.
+        If it is a file being read from a zip file, the lines read will be byte
+        objects, which will need to be converted to string objects.
+
+    Each line is passed to each selection set. If the ordinal for that line is
+    one of the row ordinals for a selection set the selection set writes it to
+    its set file (training set file for a training set, validation set file for
+    a validation set.
+
+    """
+
+    # Count the line ordinals starting from 1, not the default of 0.
+    option_base = 1
+    for (ordinal, line) in enumerate(input_file, option_base):
+
+        # If reading from a zip file, convert from bytes to string.
+        if isinstance(line, bytes):
+            line = line.decode('utf-8')
+
+        # Used for debugging.
+        #if ordinal == 1:
+            #header = line
+
+        # Delete trailing newline from last column, otherwise, if the last
+        # column is written to a training set then that training set will have
+        # extra blank lines.
+        line_fields = line.rstrip('\n').split(',')
+
+        #if len(line_fields) != original_column_count:
+            #msg = 'Line {0} has {1} columns, which doesn''t match'
+            #msg += ' the header line, which has {2} columns.'
+            #msg += '\nHeader line:\n{3}'
+            #msg += '\nline {0}:\n{4}'
+            #msg = msg.format(ordinal, len(line_fields), original_column_count, \
+                             #header, line)
+            #print(msg)
+            #sys.exit(0)
+
+        for sel_set in selection_sets:
+            sel_set.check_line(ordinal, line_fields)
+
+def process_regular_file(regular_file_name, selection_sets):
+
+    """
+    Process an unzipped original file.
+    """
+
+    with open(regular_file_name, 'r', encoding='utf_8') as input_file:
+        process_original_file(input_file, selection_sets)
+
+def process_zip_file(zip_file_name, selection_sets):
+
+    """
+    Process an zipped original file.
+
+    The csv file in the zip file is read directly from the zip archive,
+    without having to extract it.
+
+    The regular file name is assumed to be the same as the zip file name
+    but ending with ".csv" instead of ".zip" and no path.
+    """
+
+    with zipfile.ZipFile(zip_file_name, 'r') as zfile:
+
+
+        # Delete the path, everything up to the last '/', if there is one.
+        regular_file_name = zip_file_name
+        slash_index = regular_file_name.rfind('/')
+        if slash_index > 0:
+            regular_file_name = regular_file_name[slash_index+1:]
+
+        # Change the suffix from 'zip' to 'csv'. Don't use rstrip. it should
+        # work, but it doesn't remove a specific string, but any sequence of
+        # characters in that string.  'abc.pizzip'.rstrip('zip') results in
+        # 'abc.'. String function replace would replace all occurences of
+        # 'zip', ex.  'zip-of-abc.zip'.replace('zip', 'csv') becomes
+        # 'csv-of-abc.csv'. String function removesuffix isn't available before
+        # Python3 version 3.9, so it isn't always available on all production
+        # systems.
+        regular_file_name = regular_file_name[:-3] + 'csv'
+        print(f'regular_file_name {regular_file_name}')
+
+        with zfile.open(regular_file_name) as input_file:
+            process_original_file(input_file, selection_sets)
+
 def program_start():
     """
     The main function for the program.
@@ -775,51 +882,31 @@ def program_start():
      not bound to a class object).
     """
 
-    cmd_args = define_and_get_args()
-    #print_args(cmd_args)
+    args = define_and_get_args()
+    #print_args(args)
 
     # Load the original file info.
-    with open(cmd_args.original_data_file_info, 'rb') as odi_file:
+    with open(args.original_data_file_info, 'rb') as odi_file:
         (original_line_count, original_column_count) = pickle.load(odi_file)
 
-    check_args_additional(original_line_count, original_column_count, cmd_args)
+    check_args_additional(original_line_count, original_column_count, args)
 
     # If requested get a restricted set of column ordinals to use.
     column_set = None
-    if cmd_args.column_set_file_name is not None:
-        column_set = get_column_set(original_column_count, cmd_args)
+    if args.column_set_file_name is not None:
+        column_set = get_column_set(original_column_count, args)
 
     # Create SelectionSet objects.
     selection_sets = create_selection_sets(original_line_count, \
-                                           original_column_count, cmd_args, \
+                                           original_column_count, args, \
                                            column_set)
 
     print('Creating SelectionSet files...', end='')
-    with open(cmd_args.original_file_name, 'r', encoding='utf_8') as input_file:
-        # Count the line ordinals starting from 1, not the default of 0.
-        option_base = 1
-        for (ordinal, line) in enumerate(input_file, option_base):
+    if args.original_file_name.endswith('.zip'):
+        process_zip_file(args.original_file_name, selection_sets)
+    else:
+        process_regular_file(args.original_file_name, selection_sets)
 
-            # Used for debugging.
-            #if ordinal == 1:
-                #header = line
-
-            # Delete trailing newline from last column, otherwise, if the last
-            # column is written to a training set then that training set will have
-            # extra blank lines.
-            line_fields = line.rstrip('\n').split(',')
-            #if len(line_fields) != original_column_count:
-                #msg = 'Line {0} has {1} columns, which doesn''t match'
-                #msg += ' the header line, which has {2} columns.'
-                #msg += '\nHeader line:\n{3}'
-                #msg += '\nline {0}:\n{4}'
-                #msg = msg.format(ordinal, len(line_fields), original_column_count, \
-                                 #header, line)
-                #print(msg)
-                #sys.exit(0)
-
-            for sel_set in selection_sets:
-                sel_set.check_line(ordinal, line_fields)
     print('...Done')
 
 if __name__ == '__main__':

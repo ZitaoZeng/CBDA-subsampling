@@ -13,10 +13,30 @@ run multiple times.
 
 Inputs:
     File name of original data file.
-        The following assumptions are made about the contents of the file:
+
+        This may be a zip file or a plain text csv file.
+
+        If a zip file is specified, the following assumptions are made:
+           There is only one file in the file archive.
+
+           The name of the file in the file archive is the same as the
+           name of the zip file, except it has no path and it ends with
+           '.csv' instead of '.zip'.
+
+           The contents file in the file archive conform to the same
+           format as a file read directly from disk, described next.
+
+        The following assumptions are made about the contents of the actual
+        data file, whether read from a zip file or directly from a regular
+        file:
             It is a text file.
 
             It has a header line with column names.
+
+            It is a csv file/
+
+            All lines have the same number of columns, including the header
+            line.
 
 Outputs:
 
@@ -94,13 +114,22 @@ def print_args(args):
 
     print('')
 
-def get_original_file_line_count(original_file_name):
+def get_original_file_line_count(original_file_name, is_zip_file):
 
     """
     Get the line count of the original file using a system command.
     """
 
-    cmd = f'wc -l {original_file_name}' + "| awk '{print $1}'"
+    if is_zip_file:
+        # awk not needed because the wc output is just the line count
+        # when the wc input is stdin.
+        cmd = f'unzip -p {original_file_name} | wc -l'
+    else:
+        # Awk needed because the wc output will have the line count and file
+        # name. {{ and }} to avoid Python from treating it as an F string
+        # interpolation field, and causing a syntax error.
+        cmd = f"wc -l {original_file_name} | awk '{{print $1}}'"
+    #print(f'cmd {cmd}')
 
     try:
         cmd_result = subprocess.run(cmd, check=False, shell=True, text=True,
@@ -134,13 +163,16 @@ def get_original_file_line_count(original_file_name):
 
     return original_line_count
 
-def get_original_file_column_count(original_file_name):
+def get_original_file_column_count(original_file_name, is_zip_file):
 
     """
     Get the column count of the original file using a system command.
     """
-    cmd = "head -n1 {0} | sed 's#,#\\n#g' | wc -l | awk '{{print $1}}'"
-    cmd = cmd.format(original_file_name)
+    if is_zip_file:
+        cmd = f"unzip -p {original_file_name} | head -n1 | sed 's/,/\\n/g' | wc -l"
+    else:
+        cmd = f"head -n1 {original_file_name} | sed 's/,/\\n/g' | wc -l"
+    #print(f'cmd {cmd}')
 
     try:
         cmd_result = subprocess.run(cmd, check=False, shell=True, text=True,
@@ -192,8 +224,11 @@ def program_start():
     if not args.output_file_name.endswith(suffix):
         args.output_file_name += suffix
 
-    original_line_count = get_original_file_line_count(args.original_file_name)
-    original_column_count = get_original_file_column_count(args.original_file_name)
+    is_zip_file = args.original_file_name.endswith('.zip')
+    original_line_count = get_original_file_line_count(args.original_file_name,
+                                                       is_zip_file)
+    original_column_count = get_original_file_column_count(
+                                args.original_file_name, is_zip_file)
 
     # Create a single data structure for writing to the Pickle file.
     save_info = (original_line_count, original_column_count)
