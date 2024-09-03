@@ -494,7 +494,7 @@ def define_and_get_args(args=None):
     msg += ' to use'
     parser.add_argument('--cs', '--column-set', dest='column_set_file_name', \
                         help=msg, type=str, default=None, required=False)
-    
+
     msg = 'The delimiter of the original file'
     parser.add_argument('--del', '--delimiter', \
                         dest='delimiter', help=msg, \
@@ -890,7 +890,7 @@ def process_zip_file(zip_file_name, selection_sets, delimiter):
         try:
             with zfile.open(regular_file_name) as input_file:
                 process_original_file(input_file, selection_sets, delimiter)
-        except Exception as e:
+        except IOError as e:
             msg = '\nThe following exception occured opening'
             msg += ' zip file member {} from zip file {}\n{}'
             msg = msg.format(regular_file_name, zip_file_name, e)

@@ -85,7 +85,7 @@ def define_args(args=None):
     msg = 'The name for the output file.'
     parser.add_argument('-o', '--output-file', dest='output_file_name',
                         help=msg, type=str, default=None, required=True)
-    
+
     msg = 'Setting the delimiter of original file'
     parser.add_argument('--del', '--delimiter', \
                         dest='delimiter', help=msg, \
@@ -249,7 +249,7 @@ def program_start():
     print(f'original_column_count {original_column_count}')
 
     if original_line_count <= 1:
-        print(f'The original file line count seems too small.')
+        print('The original file line count seems too small.')
 
     if original_column_count <= 3:
         print('The original column count seems too small.')
