@@ -112,7 +112,7 @@ create_sets.py
 **************
 
 This creates the validation set(s) and training sets. It reads the Pickle file
-prodcued by get_original_file_info.py and the original data file.  It uses
+produced by get_original_file_info.py and the original data file.  It uses
 command line options for the number of rows and columns to include in each
 validation and training set, the column ordinals for the case number and
 outcome columns and the number of training sets to produce.
@@ -131,7 +131,9 @@ and training sets. If creating a single validation set and 1,000 training sets,
 it takes one pass of the original data set, not 1,001 passes.
 
 This is limited by the maximum number of open files a user or user process can
-have on a system, which is usually around 1,020 on a Linux system.
+have on a system, which is usually around 1,020 on a Linux system. If creating
+more than that number files (number of training sets + number of validation
+sets), see section "Multiple Runs" below.
 
 This script produces the following files, which is different for Option 1 and
 Option 2.
@@ -215,6 +217,144 @@ training-set-i-row-ordinals:
 
 There is no file for training set column ordinals, because for Option 2 a
 training set uses the same columns as its validation set.
+
+=============
+Multiple Runs
+=============
+
+As noted above there is a maximum number of open files a user or user process
+can have on a system, which is usually around 1,020 on a Linux system.
+
+To handle this create_sets.py can be run multiple times to create the full
+number of training and validation sets. 
+
+Here's an example of creating 5 training sets in two runs. This is much less
+than a system file open, but the process is the same.
+
+We do the first create_sets.py run to create the first 3 training sets, each
+with its own validation set (the --mvs option).
+
+$ ../create_sets.py -i test-data.csv --odfi test-data.csv.pickle --trc 3 --vrc 4 --cc 3 --cn 7 --oc 2 --tsc 3 --mvs
+Creating SelectionSet objects......Done
+Creating SelectionSet files......Done
+
+This results in the 3 training sets and a validation set for each.
+ls -v | cat
+
+training-set-1
+training-set-1-row-ordinals
+training-set-2
+training-set-2-row-ordinals
+training-set-3
+training-set-3-row-ordinals
+validation-set-1
+validation-set-1-column-ordinals
+validation-set-1-row-ordinals
+validation-set-2
+validation-set-2-column-ordinals
+validation-set-2-row-ordinals
+validation-set-3
+validation-set-3-column-ordinals
+validation-set-3-row-ordinals
+
+To create the next set of training and validation sets, we run create_sets.py
+with the "-s 4" option to specify a starting set number of 4 to use for the
+next training and validation sets to be created.
+
+We also specify the number of training sets to create to be 2 (--tsc 2), since
+we want to create 5 total.
+
+Typically when dealing with the open file limit, each run of create_sets.py,
+except the last, will create the same number of training sets  - something
+close to or at the open file limit.
+
+The last run of create_sets.py will then typically need to create fewer
+training sets, since the total number of training sets we want to create is not
+evenly divisble by the open file limit.
+
+$ ../create_sets.py -i test-data.csv --odfi test-data.csv.pickle --trc 3 --vrc 4 --cc 3 --cn 7 --oc 2 --tsc 3 --mvs -s 4
+Creating SelectionSet objects......Done
+Creating SelectionSet files......Done
+
+This results in the 3 additional training and validation sets, numbered from 4 to 6.
+
+$ ls -v | cat
+training-set-1
+training-set-1-row-ordinals
+training-set-2
+training-set-2-row-ordinals
+training-set-3
+training-set-3-row-ordinals
+training-set-4
+training-set-4-row-ordinals
+training-set-5
+training-set-5-row-ordinals
+validation-set-1
+validation-set-1-column-ordinals
+validation-set-1-row-ordinals
+validation-set-2
+validation-set-2-column-ordinals
+validation-set-2-row-ordinals
+validation-set-3
+validation-set-3-column-ordinals
+validation-set-3-row-ordinals
+validation-set-4
+validation-set-4-column-ordinals
+validation-set-4-row-ordinals
+validation-set-5
+validation-set-5-column-ordinals
+validation-set-5-row-ordinals
+
+This also works when using a single validation set, i.e. not using the --mvs
+option.  In that case an additional file is created, validation-set.pickle.
+This is a saved version of the Python ValidationSet object containing
+information about the validation set.  On subsequent runs, this file is used to
+recreate the Python ValidationSet object, since the information it contains is
+needed when creating the training sets.
+
+For the first run:
+
+$ ../create_sets.py -i test-data.csv --odfi test-data.csv.pickle --trc 3 --vrc 4 --cc 3 --cn 7 --oc 2 --tsc 3
+Creating SelectionSet objects......Done
+Creating SelectionSet files......Done
+$ ls -v | cat
+training-set-1
+training-set-1-column-ordinals
+training-set-1-row-ordinals
+training-set-2
+training-set-2-column-ordinals
+training-set-2-row-ordinals
+training-set-3
+training-set-3-column-ordinals
+training-set-3-row-ordinals
+validation-set
+validation-set.pickle
+validation-set-row-ordinals
+
+For the second run:
+
+$ ../create_sets.py -i test-data.csv --odfi test-data.csv.pickle --trc 3 --vrc 4 --cc 3 --cn 7 --oc 2 --tsc 2 -s 4
+Creating SelectionSet objects......Done
+Creating SelectionSet files......Done
+pwolberg@helico: sets $ ls -v | cat
+training-set-1
+training-set-1-column-ordinals
+training-set-1-row-ordinals
+training-set-2
+training-set-2-column-ordinals
+training-set-2-row-ordinals
+training-set-3
+training-set-3-column-ordinals
+training-set-3-row-ordinals
+training-set-4
+training-set-4-column-ordinals
+training-set-4-row-ordinals
+training-set-5
+training-set-5-column-ordinals
+training-set-5-row-ordinals
+validation-set
+validation-set.pickle
+validation-set-row-ordinals
 
 ********************
 create_test_data_set

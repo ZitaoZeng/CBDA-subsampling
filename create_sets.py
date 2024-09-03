@@ -901,7 +901,7 @@ def program_start():
     """
 
     args = define_and_get_args()
-    print_args(args)
+    #print_args(args)
 
     # Load the original file info.
     with open(args.original_data_file_info, 'rb') as odi_file:
