@@ -85,6 +85,11 @@ def define_args(args=None):
     msg = 'The name for the output file.'
     parser.add_argument('-o', '--output-file', dest='output_file_name',
                         help=msg, type=str, default=None, required=True)
+    
+    msg = 'Setting the delimiter of original file'
+    parser.add_argument('--del', '--delimiter', \
+                        dest='delimiter', help=msg, \
+                        type=str, default=',', required=False)
 
     args = parser.parse_args()
 
@@ -111,6 +116,7 @@ def print_args(args):
 
     print(f'args.original_file_name: {args.original_file_name}')
     print(f'args.output_file_name: {args.output_file_name}')
+    print(f'args.delimiter: {args.delimiter}')
 
     print('')
 
@@ -163,15 +169,15 @@ def get_original_file_line_count(original_file_name, is_zip_file):
 
     return original_line_count
 
-def get_original_file_column_count(original_file_name, is_zip_file):
+def get_original_file_column_count(original_file_name, is_zip_file, delimiter):
 
     """
     Get the column count of the original file using a system command.
     """
     if is_zip_file:
-        cmd = f"unzip -p {original_file_name} | head -n1 | sed 's/,/\\n/g' | wc -l"
+        cmd = f"unzip -p {original_file_name} | head -n1 | sed 's/{delimiter}/\\n/g' | wc -l"
     else:
-        cmd = f"head -n1 {original_file_name} | sed 's/,/\\n/g' | wc -l"
+        cmd = f"head -n1 {original_file_name} | sed 's/{delimiter}/\\n/g' | wc -l"
     #print(f'cmd {cmd}')
 
     try:
@@ -217,6 +223,7 @@ def program_start():
     """
 
     args = define_args()
+    delimiter = args.delimiter
     #print_args(args)
 
     # Ensure the output file has a specific suffix.
@@ -228,7 +235,8 @@ def program_start():
     original_line_count = get_original_file_line_count(args.original_file_name,
                                                        is_zip_file)
     original_column_count = get_original_file_column_count(
-                                args.original_file_name, is_zip_file)
+                                args.original_file_name, is_zip_file,
+                                delimiter)
 
     # Create a single data structure for writing to the Pickle file.
     save_info = (original_line_count, original_column_count)
@@ -236,6 +244,18 @@ def program_start():
     # Write the Pickle file.
     with open(args.output_file_name, 'wb') as output_file:
         pickle.dump(save_info, output_file)
+
+    print(f'original_line_count {original_line_count}')
+    print(f'original_column_count {original_column_count}')
+
+    if original_line_count <= 1:
+        print(f'The original file line count seems too small.')
+
+    if original_column_count <= 3:
+        print('The original column count seems too small.')
+        msg = 'There should be a case column, outcome column'
+        msg += ' and at least more than 1 attribute column.'
+        print(msg)
 
 if __name__ == '__main__':
     program_start()

@@ -486,6 +486,11 @@ def define_and_get_args(args=None):
     msg += ' to use'
     parser.add_argument('--cs', '--column-set', dest='column_set_file_name', \
                         help=msg, type=str, default=None, required=False)
+    
+    msg = 'The delimiter of the original file'
+    parser.add_argument('--del', '--delimiter', \
+                        dest='delimiter', help=msg, \
+                        type=str, default=',', required=False)
 
     args = parser.parse_args()
     return args
@@ -601,6 +606,7 @@ def print_args(args):
     print(f'args.training_set_count: {args.training_set_count}')
     print(f'args.starting_set_number: {args.starting_set_number}')
     print(f'args.column_set_file_name: {args.column_set_file_name}')
+    print(f'args.delimiter: {args.delimiter}')
 
     print('')
 
@@ -780,7 +786,7 @@ def create_selection_sets(original_line_count, original_column_count, args, \
     print('...Done')
     return selection_sets
 
-def process_original_file(input_file, selection_sets):
+def process_original_file(input_file, selection_sets, delimiter):
 
     """
 
@@ -809,10 +815,15 @@ def process_original_file(input_file, selection_sets):
         #if ordinal == 1:
             #header = line
 
+        if line.find(delimiter) == -1:
+            msg = f'The delimiter, "{delimiter}" was not found in line\n {line}'
+            print(msg)
+            sys.exit(1)
+
         # Delete trailing newline from last column, otherwise, if the last
         # column is written to a training set then that training set will have
         # extra blank lines.
-        line_fields = line.rstrip('\n').split(',')
+        line_fields = line.rstrip('\n').split(delimiter)
 
         #if len(line_fields) != original_column_count:
             #msg = 'Line {0} has {1} columns, which doesn''t match'
@@ -827,16 +838,16 @@ def process_original_file(input_file, selection_sets):
         for sel_set in selection_sets:
             sel_set.check_line(ordinal, line_fields)
 
-def process_regular_file(regular_file_name, selection_sets):
+def process_regular_file(regular_file_name, selection_sets, delimiter):
 
     """
     Process an unzipped original file.
     """
 
     with open(regular_file_name, 'r', encoding='utf_8') as input_file:
-        process_original_file(input_file, selection_sets)
+        process_original_file(input_file, selection_sets, delimiter)
 
-def process_zip_file(zip_file_name, selection_sets):
+def process_zip_file(zip_file_name, selection_sets, delimiter):
 
     """
     Process an zipped original file.
@@ -870,7 +881,7 @@ def process_zip_file(zip_file_name, selection_sets):
 
         try:
             with zfile.open(regular_file_name) as input_file:
-                process_original_file(input_file, selection_sets)
+                process_original_file(input_file, selection_sets, delimiter)
         except Exception as e:
             msg = '\nThe following exception occured opening'
             msg += ' zip file member {} from zip file {}\n{}'
@@ -890,7 +901,7 @@ def program_start():
     """
 
     args = define_and_get_args()
-    #print_args(args)
+    print_args(args)
 
     # Load the original file info.
     with open(args.original_data_file_info, 'rb') as odi_file:
@@ -910,9 +921,11 @@ def program_start():
 
     print('Creating SelectionSet files...', end='')
     if args.original_file_name.endswith('.zip'):
-        process_zip_file(args.original_file_name, selection_sets)
+        process_zip_file(args.original_file_name, selection_sets,
+                         args.delimiter)
     else:
-        process_regular_file(args.original_file_name, selection_sets)
+        process_regular_file(args.original_file_name, selection_sets,
+                             args.delimiter)
 
     print('...Done')
 
