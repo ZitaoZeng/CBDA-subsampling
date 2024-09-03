@@ -868,8 +868,15 @@ def process_zip_file(zip_file_name, selection_sets):
         regular_file_name = regular_file_name[:-3] + 'csv'
         #print(f'regular_file_name {regular_file_name}')
 
-        with zfile.open(regular_file_name) as input_file:
-            process_original_file(input_file, selection_sets)
+        try:
+            with zfile.open(regular_file_name) as input_file:
+                process_original_file(input_file, selection_sets)
+        except Exception as e:
+            msg = '\nThe following exception occured opening'
+            msg += ' zip file member {} from zip file {}\n{}'
+            msg = msg.format(regular_file_name, zip_file_name, e)
+            print(msg)
+            sys.exit(1)
 
 def program_start():
     """
