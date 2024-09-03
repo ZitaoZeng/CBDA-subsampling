@@ -866,7 +866,7 @@ def process_zip_file(zip_file_name, selection_sets):
         # Python3 version 3.9, so it isn't always available on all production
         # systems.
         regular_file_name = regular_file_name[:-3] + 'csv'
-        print(f'regular_file_name {regular_file_name}')
+        #print(f'regular_file_name {regular_file_name}')
 
         with zfile.open(regular_file_name) as input_file:
             process_original_file(input_file, selection_sets)
