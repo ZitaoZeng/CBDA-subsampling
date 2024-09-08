@@ -60,11 +60,6 @@ Inputs:
         by the algorithm defined by the machine learning processing of the
         training sets generated here.
 
-    Whether to create one validation set, or to create a validation set for
-    each training set. Optional.
-        If not present create one validation set. If present create a
-        validation set for each training set.
-
     The number of training sets to create.
 
     The starting set number. Optional.
@@ -99,15 +94,10 @@ Inputs:
 Outputs:
    An output file for each training set.
 
-   Either:
 
-       One validation set file:
-           No training set will contain the any of the original data file
-           lines as the validation set file.
-
-       A validation set file for each training set file.
-           A training set file will not contain any of the original data file
-           lines as its corresponding validation set file.
+   A validation set file for each training set file.
+       A training set file will not contain any of the original data file
+       lines as its corresponding validation set file.
 """
 
 import sys
@@ -265,14 +255,11 @@ class ValidationSet(SelectionSet):
     of row ordinals for the lines of the original file for this validation set
     and a set of column ordinals for the columns of the original file for this
     validation set.
-
-    save is true if using a single validation set, in which case we save this
-    validation set in a Pickle file.
     """
 
     # pylint: disable-next=too-many-arguments
     def __init__(self, ordinal, original_line_count, original_column_count, \
-                 args, column_set, save=False):
+                 args, column_set):
 
         SelectionSet.__init__(self)
 
@@ -287,15 +274,13 @@ class ValidationSet(SelectionSet):
                                                      original_line_count)
 
         # Determine the columns to use for this validation set. If a column set
-        # was provided, use it. Otherwise if not saving use a random set of
-        # columns and if saving use all columns (column_ordinals and
-        # output_columns remain None).
+        # was provided, use it. Otherwise use a random set of columns.
         self.column_ordinals = None
         self.output_columns = None
         if column_set is not None:
             self.column_ordinals = column_set
             self.define_output_columns(args)
-        elif not save:
+        else:
             exclude_cols = set([args.case_column, args.outcome_column])
             self.column_ordinals = self.get_random_ordinals_exclude(
                                           args.column_count, 1, \
@@ -318,13 +303,6 @@ class ValidationSet(SelectionSet):
             self.write_ordinals(self.column_ordinals, \
                                 self.column_ordinal_file_name)
 
-        # This must come before opening the validation set file, since an open
-        # file object (or perhaps any file object) can't be pickled.
-        if save:
-            save_file_name = self.file_name + '.pickle'
-            with open(save_file_name, 'wb') as save_file:
-                pickle.dump(self, save_file)
-
         self.open_set_file()
 
     def open_set_file(self):
@@ -345,55 +323,39 @@ class TrainingSet(SelectionSet):
     a set of column ordinals for the columns of the original file for this
     training set.
 
-    If the constructor is passed a ValidationSet object, then a single
-    validation set is used for all training sets. No training set will choose
-    row ordinals that are in that single validation set.
+    Each training set has its own validation set. The training set
+    will not choose row ordinals that are in its associated validation set,
+    but may choose row ordinals that are in the validation set of some other
+    training set.
 
-    If the constructor is not passed a ValidationSet object, then each training
-    set has its own validation set. In this case a training set will not choose
-    row ordinals that are in its associated validation set, but may choose row
-    ordinals that are in the validation set of some other training set.
-    """
+    The training set and validation set will both use the same columns
+    from the original file.
+"""
 
     # pylint: disable-next=too-many-arguments
     def __init__(self, trainingOrdinal, original_line_count, \
-                 original_column_count, single_validation_set, args, column_set):
+                 original_column_count, args, column_set):
 
         SelectionSet.__init__(self)
 
         # Used for output file names and error mesages.
         self.ordinal = trainingOrdinal
 
-        exclude_validation_set = single_validation_set
-        self.validation_set = None
-        if single_validation_set is None:
-            self.validation_set = ValidationSet(self.ordinal, \
-                                               original_line_count, \
-                                               original_column_count, args, \
-                                               column_set)
-            exclude_validation_set = self.validation_set
+        self.validation_set = ValidationSet(self.ordinal, \
+                                            original_line_count, \
+                                            original_column_count, args, \
+                                            column_set)
 
-            # When using a separate validation set for each training set, the
-            # training set uses the same columns as the validation set.
-            self.column_ordinals = self.validation_set.column_ordinals
-        else:
-            # The columns to be written for each line for this training set,
-            # i.e. the columns of the lines specified by self.row_ordinals. This
-            # does not include the case column or output column.
-            exclude_cols = set([args.case_column, args.outcome_column])
-            if column_set is None:
-                self.column_ordinals = self.get_random_ordinals_exclude( \
-                                             args.column_count, 1, \
-                                             original_column_count, exclude_cols)
-            else:
-                self.column_ordinals = column_set
+        # The training set uses the same columns as the validation set.
+        self.column_ordinals = self.validation_set.column_ordinals
 
         # The rows (lines) of the original data file to be written to this
         # training set.
         # 2, to skip the ordinal for the original file header line.
         self.row_ordinals = self.get_random_ordinals_exclude( \
-                                args.training_row_count, 2, original_line_count, \
-                                exclude_validation_set.row_ordinals)
+                                args.training_row_count, 2,
+                                original_line_count, \
+                                self.validation_set.row_ordinals)
 
         self.define_output_columns(args)
 
@@ -405,16 +367,6 @@ class TrainingSet(SelectionSet):
 
         f = f'training-set-{trainingOrdinal}-column-ordinals'
         self.column_ordinal_file_name = f
-
-        # If using a single validation set then write the column ordinals for
-        # this training set to a file.  If not using a single validation set
-        # (using a separate validation set for each training set) then don't
-        # write its columns, since they are the same as those for this training
-        # set's validation set, and the validation set has already written
-        # them.
-        if single_validation_set is not None:
-            self.write_ordinals(self.column_ordinals, \
-                                self.column_ordinal_file_name)
 
         # pylint: disable=consider-using-with
         self.set_file = open(self.file_name, 'w', encoding='utf_8')
@@ -473,12 +425,6 @@ def define_and_get_args(args=None):
     msg = 'The outcome column ordinal'
     parser.add_argument('--oc', '--outcome-column', dest='outcome_column', \
                         help=msg, type=int, required=True)
-
-    msg = 'If present create a validation set for each training set.'
-    msg += ' Otherwise create only one validation set.'
-    parser.add_argument('--mvs', '--multiple-validation-set', \
-                        dest='multiple_validation_set', help=msg, \
-                        action='store_true', default=False)
 
     msg = 'The number of training sets to create'
     parser.add_argument('--tsc', '--training-set-count', \
@@ -607,10 +553,6 @@ def print_args(args):
     print(f'args.column_count: {args.column_count}')
     print(f'args.case_column: {args.case_column}')
     print(f'args.outcome_column: {args.outcome_column}')
-
-    msg = 'args.multiple_validation_set: {0}'
-    print(msg.format(args.multiple_validation_set))
-
     print(f'args.training_set_count: {args.training_set_count}')
     print(f'args.starting_set_number: {args.starting_set_number}')
     print(f'args.column_set_file_name: {args.column_set_file_name}')
@@ -741,51 +683,15 @@ def create_selection_sets(original_line_count, original_column_count, args, \
     print('Creating SelectionSet objects...', end='')
     selection_sets = []
 
-    # Get a single validation set if requested.
-    #
-    # If using a single validation set, only create it (define rows and columns
-    # to use) if the starting set number is 1. This avoids creating it multiple
-    # times if this script is run multiple times when creating a large number
-    # of training sets and only 1 validation set. Multiple runs of this script
-    # might be needed to avoid the system max open file limit.
-    #
-    # Otherwise load a previously created one from a file.
-    single_validation_set = None
-    if not args.multiple_validation_set:
-
-        if args.starting_set_number == 1:
-            # -1 for the set ordinal because there is only one validation set, not
-            # one per training set.
-            try:
-                single_validation_set = ValidationSet(-1, original_line_count, \
-                                                   original_column_count, args, \
-                                                   column_set, save=True)
-                selection_sets.append(single_validation_set)
-            # pylint: disable=broad-exception-caught
-            except (Exception) as e:
-                msg = 'An exception occured creating the single validation set:'
-                msg += '\n{0}'
-                msg = msg.format(e)
-                print(msg)
-                sys.exit(1)
-        else:
-            # Load the validation set created on a prior run of this script,
-            # when the starting set number was 1. Needed so the training sets
-            # know not to create their own validation sets.
-            load_file_name = 'validation-set.pickle'
-            with open(load_file_name, 'rb') as load_file:
-                single_validation_set = pickle.load(load_file)
-
-
     # Create the training sets.
     ending_set_number = args.starting_set_number - 1 + args.training_set_count
     for i in range(args.starting_set_number, ending_set_number + 1):
         try:
-            tr_set = TrainingSet(i, original_line_count, original_column_count, \
-                                single_validation_set, args, column_set)
+            tr_set = TrainingSet(i, original_line_count, original_column_count,
+                                 args, column_set)
             selection_sets.append(tr_set)
         # pylint: disable=broad-exception-caught
-        except (Exception) as e:
+        except Exception as e:
             msg = 'An exception occured creating TrainingSet {0} of {1}:\n{2}'
             msg = msg.format(i, args.training_set_count, e)
             print(msg)
