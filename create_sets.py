@@ -157,29 +157,30 @@ class SelectionSet:
         self.output_columns.append(args.outcome_column)
         self.output_columns += column_ordinals_sorted
 
-    def get_random_ordinals(self, count, end):
+    def get_random_ordinals(self, ordinals, count):
 
         """
-        Generate the set of validation line ordinals.
-        Get a set of count random integers between 2 and end, inclusive.
-        2 to avoid the header line.
+        Generate the set of data line ordinals.
+        Get a set of count random elements from ordinals.
 
-        count and end should be integers.
+        ordinals are a list of data line ordinals from the original file.
 
-        count should be < (end - 1) (-1 to exclude the header line)
+        count should be an integer.
         """
 
-        # Make it a set so a training set can efficiently avoid using any
-        # validation set line ordinal.
-        ordinal_list = random.sample(range(2, end+1), count)
-        ordinal_set = set(ordinal_list)
-        return ordinal_set
+        ordinal_sample = random.sample(ordinals, count)
+        return ordinal_sample
 
     def get_random_ordinals_exclude(self, count, start, end, exclude):
 
         """
         Get a set of count random integers between start and end, inclusive,
         but not including any integers in the exclude.
+
+        This is without replacement, so a random integer should also not
+        already be in the result set. This is enforced by the set data type
+        which does not have duplciates. The set add function doesn't change
+        the set if it already has the element being added.
 
         count, start and end should be integers.
 
@@ -257,9 +258,16 @@ class ValidationSet(SelectionSet):
     validation set.
     """
 
+    # The subset of row ordinals from the original data file to use for
+    # sampling when creating a validation set.
+    available_ordinals = None
+
     # pylint: disable-next=too-many-arguments
-    def __init__(self, ordinal, original_line_count, original_column_count, \
-                 args, column_set):
+    def __init__(self, ordinal, original_column_count, args, column_set):
+
+        if ValidationSet.available_ordinals is None:
+            msg = 'ValidationSet: available_ordinals has not been defined'
+            raise ValueError(msg)
 
         SelectionSet.__init__(self)
 
@@ -269,9 +277,9 @@ class ValidationSet(SelectionSet):
         # the associated training set.
         self.ordinal = ordinal
 
-        # 2, to skip the ordinal for the original file header line.
-        self.row_ordinals = self.get_random_ordinals(args.validation_row_count,
-                                                     original_line_count)
+        self.row_ordinals = self.get_random_ordinals(
+                                     ValidationSet.available_ordinals,
+                                     args.validation_row_count)
 
         # Determine the columns to use for this validation set. If a column set
         # was provided, use it. Otherwise use a random set of columns.
@@ -283,7 +291,7 @@ class ValidationSet(SelectionSet):
         else:
             exclude_cols = set([args.case_column, args.outcome_column])
             self.column_ordinals = self.get_random_ordinals_exclude(
-                                          args.column_count, 1, \
+                                          args.column_count, 1,
                                           original_column_count, exclude_cols)
             self.define_output_columns(args)
 
@@ -324,38 +332,43 @@ class TrainingSet(SelectionSet):
     training set.
 
     Each training set has its own validation set. The training set
-    will not choose row ordinals that are in its associated validation set,
-    but may choose row ordinals that are in the validation set of some other
-    training set.
+    will not choose row ordinals that are in any validation set, its own
+    validation set or the validation set for another training set,
+    since the training set row ordinals are sampled from a distinct subset
+    of the original file row ordinals than the validation sets are sampled
+    from.
 
-    The training set and validation set will both use the same columns
+    The training set and and its validation set will both use the same columns
     from the original file.
 """
 
+    # The subset of row ordinals from the original data file to use for
+    # sampling when creating a training set.
+    available_ordinals = None
+
     # pylint: disable-next=too-many-arguments
-    def __init__(self, trainingOrdinal, original_line_count, \
-                 original_column_count, args, column_set):
+    def __init__(self, trainingOrdinal, original_column_count, args,
+                 column_set):
+
+        if TrainingSet.available_ordinals is None:
+            msg = 'TrainingSet: available_ordinals has not been defined'
+            raise ValueError(msg)
 
         SelectionSet.__init__(self)
 
         # Used for output file names and error mesages.
         self.ordinal = trainingOrdinal
 
-        self.validation_set = ValidationSet(self.ordinal, \
-                                            original_line_count, \
-                                            original_column_count, args, \
+        self.validation_set = ValidationSet(self.ordinal,
+                                            original_column_count, args,
                                             column_set)
 
         # The training set uses the same columns as the validation set.
         self.column_ordinals = self.validation_set.column_ordinals
 
-        # The rows (lines) of the original data file to be written to this
-        # training set.
-        # 2, to skip the ordinal for the original file header line.
-        self.row_ordinals = self.get_random_ordinals_exclude( \
-                                args.training_row_count, 2,
-                                original_line_count, \
-                                self.validation_set.row_ordinals)
+        self.row_ordinals = self.get_random_ordinals(
+                                     TrainingSet.available_ordinals,
+                                     args.training_row_count)
 
         self.define_output_columns(args)
 
@@ -402,6 +415,12 @@ def define_and_get_args(args=None):
     parser.add_argument('--odfi', '--original-data-file-info',
                         dest='original_data_file_info', help=msg, type=str, \
                         default=None, required=True)
+
+    msg = 'The percentage of original file records to use'
+    msg += ' for sampling training sets. The remaining record to use for'
+    msg += ' sampling validation sets.'
+    parser.add_argument('--tp', '--training-percent', dest='training_percent',
+                        help=msg, type=float, required=True)
 
     msg = 'The number of rows to extract for each training set.'
     parser.add_argument('--trc', '--training-row-count', \
@@ -467,6 +486,11 @@ def check_args(args=None):
     if not os.path.isfile(args.original_data_file_info):
         msg = '\nValidation ordinal file "{0}" does not exist.\n'
         msg = msg.format(args.original_data_file_info)
+        print(msg)
+        args_ok = False
+
+    if args.training_percent <= 0.0 or args.training_percent >= 1.0:
+        msg = 'Training percent should between 0 and 1, exclusive, i.e. (0,1).\n'
         print(msg)
         args_ok = False
 
@@ -545,6 +569,8 @@ def print_args(args):
     msg = 'args.original_data_file_info: {0}'
     print(msg.format(args.original_data_file_info))
 
+    print(f'args.training_percent: {args.training_percent}')
+
     print(f'args.training_row_count: {args.training_row_count}')
 
     msg = 'args.validation_row_count: {0}'
@@ -560,26 +586,14 @@ def print_args(args):
 
     print('')
 
-def check_args_additional(original_line_count, original_column_count, args):
+def check_args_additional(original_column_count, args):
 
     """
-    Perform argument checks that require information read from files.
+    Perform argument checks that require information read from the pickle file
+    of original file info.
     """
 
     args_ok = True
-
-    # -1 to exclude the header line.
-    # - args.validation_row_count to exclude the validation rows.
-    available_training_rows = original_line_count - 1 - args.validation_row_count
-    if args.training_row_count > available_training_rows:
-        msg = 'The training row count, {0}, is greater than the available'
-        msg += ' training rows:'
-        msg += '\n{1} = {2}(original file rows) - 1(exclude header line) -'
-        msg += ' {3}(exclude validation rows).'
-        msg = msg.format(args.training_row_count, available_training_rows, \
-                         original_line_count, args.validation_row_count)
-        print(msg)
-        args_ok = False
 
     if args.case_column > original_column_count:
         msg = 'The case number column ordinal, {0}, is greater than the number'
@@ -673,8 +687,47 @@ def get_column_set(original_column_count, args):
 
     return column_set
 
-def create_selection_sets(original_line_count, original_column_count, args, \
-                          column_set):
+def define_available_ordinals(original_line_count, args):
+
+    """
+    Define two disjoint sets of line ordinals from the original file to be
+    used for sampling to create the training sets and validation sets.
+
+    The ordinals for the data lines are shuffled, the first training_percent
+    are chosen for sampling to create the training sets, and the remaining
+    data ordinals used for sampling to create the validation sets.
+    """
+
+    # 2 to skip the header line.
+    data_ordinals = list(range(2, original_line_count+1))
+    random.shuffle(data_ordinals)
+
+    data_ordinal_count = len(data_ordinals)
+    training_ordinal_count = int(args.training_percent * data_ordinal_count)
+    validation_ordinal_count = data_ordinal_count - training_ordinal_count
+
+    args_ok = True
+    if args.training_row_count >= training_ordinal_count:
+        msg = 'The training row count, {}, is greater than the available'
+        msg += ' training rows {}.'
+        msg = msg.format(args.training_row_count, training_ordinal_count)
+        print(msg)
+        args_ok = False
+
+    if args.validation_row_count >= validation_ordinal_count:
+        msg = 'The validation row count, {}, is greater than the available'
+        msg += ' validation rows {}.'
+        msg = msg.format(args.validation_row_count, validation_ordinal_count)
+        print(msg)
+        args_ok = False
+
+    if not args_ok:
+        sys.exit(1)
+
+    TrainingSet.available_ordinals = data_ordinals[0:training_ordinal_count]
+    ValidationSet.available_ordinals = data_ordinals[training_ordinal_count:]
+
+def create_selection_sets(original_column_count, args, column_set):
 
     """
     Create the validation set and training set objects.
@@ -687,8 +740,7 @@ def create_selection_sets(original_line_count, original_column_count, args, \
     ending_set_number = args.starting_set_number - 1 + args.training_set_count
     for i in range(args.starting_set_number, ending_set_number + 1):
         try:
-            tr_set = TrainingSet(i, original_line_count, original_column_count,
-                                 args, column_set)
+            tr_set = TrainingSet(i, original_column_count, args, column_set)
             selection_sets.append(tr_set)
         # pylint: disable=broad-exception-caught
         except Exception as e:
@@ -821,16 +873,17 @@ def program_start():
     with open(args.original_data_file_info, 'rb') as odi_file:
         (original_line_count, original_column_count) = pickle.load(odi_file)
 
-    check_args_additional(original_line_count, original_column_count, args)
+    check_args_additional(original_column_count, args)
 
     # If requested get a restricted set of column ordinals to use.
     column_set = None
     if args.column_set_file_name is not None:
         column_set = get_column_set(original_column_count, args)
 
+    define_available_ordinals(original_line_count, args)
+
     # Create SelectionSet objects.
-    selection_sets = create_selection_sets(original_line_count, \
-                                           original_column_count, args, \
+    selection_sets = create_selection_sets(original_column_count, args,
                                            column_set)
 
     print('Creating SelectionSet files...', end='')

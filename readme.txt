@@ -22,15 +22,15 @@ various subsets.
 
 There is a separate validation set for each training set.
 
-The training set and its associated validation do not share any rows in common.
-However, both have the same randomly selected subset of attributes.
+The rows (lines) of the original data file are partitioned into two disjoint
+subsets - a subset for creating the training set samples and a subset for
+creating the validation set samples. This ensures that no row in a validation
+set appears in any training set.
 
-The randomly selected rows from the original file for a training set are
-different from the randomly selected rows from the original file for the
-validation set associated with that training set.  However some of the rows for
-a training set might be the same as some of the rows of a validation set
-associated with another training set.
-
+The number of original data file rows to use is specified as a percentage (a
+value between 0 and 1), by a command line option (--tp) to script
+create_sets.py. The remaining row if the original file are used for creating
+the validation sets.
 
 There are 4 scripts in this part of the CBDA project, 3 Python3 scripts and 1
 bash script. For the Python scripts use the "-h" command line option to see the
@@ -86,12 +86,14 @@ This creates the validation set(s) and training sets. It reads the Pickle file
 produced by get_original_file_info.py and the original data file.  It uses
 command line options for the number of rows and columns to include in each
 validation and training set, the column ordinals for the case number and
-outcome columns and the number of training sets to produce.
+outcome columns, the number of training sets to produce and the percentage (a
+value betwen 0 and 1) of the original data file lines to use for training sets
+(with the remainder of the original data file lines used for validation sets).
 
 It excludes the case number and outcome column from the randomly selected
-attribute column ordinals to include for a training set, but it does write
-those columns to each training set and each validation set, in addition to the
-randomly selected attribute columns.
+attribute column ordinals to include for a training or validation set, but it
+does write those columns to each training set and each validation set, in
+addition to the randomly selected attribute columns.
 
 It makes a single pass of the original data set to create all the validation
 and training sets. If creating 500 training sets, which also means creating 500
@@ -109,7 +111,7 @@ This script produces the following files.
 
 validation-set-i:
 
-	The validation set data, the randomly selected row and columns (plus the case
+	The validation set data, the randomly selected rows and columns (plus the case
 	number and outcome column). Ex. validation-set-1, validation-set-2, etc.
 
     The first column is the case number column.
@@ -119,14 +121,16 @@ validation-set-i:
 
 validation-set-i-row-ordinals:
 
-	The	row ordinals for the rows in the validation set data.  This may be needed
-	by the machine learning step or the validation step.
+	The	row ordinals in the original data file for the rows in the validation
+	set data.  This may be needed by the machine learning step or the
+	validation step.
 
 validation-set-i-column-ordinals:
 
-	The	column ordinals for the columns in the validation set data, not including
-	the case number or outcome column ordinals.  This may be needed by the
-	machine learning step or the validation step.
+	The	column ordinals in the original data file for the columns in the
+	validation set data, not including the case number or outcome column
+	ordinals.  This may be needed by the machine learning step or the
+	validation step.
 
 2 files for each training set:
 
@@ -142,8 +146,9 @@ training-set-i:
 
 training-set-i-row-ordinals:
 
-	The	row ordinals for the rows in the training set data.  This may be needed
-	by the machine learning step or the training step.
+	The	row ordinals in the original data file for the rows in the training
+	set data.  This may be needed by the machine learning step or the training
+	step.
 
 There is no file for training set column ordinals, because a training set uses
 the same columns as its validation set.
@@ -164,7 +169,7 @@ than a system file open limit, but the process is the same.
 We do the first create_sets.py run to create the first 3 training sets, each
 with its own validation set.
 
-$ ../create_sets.py -i test-data.csv --odfi test-data.csv.pickle --trc 3 --vrc 4 --cc 3 --cn 7 --oc 2 --tsc 3
+$ create_sets.py -i test-data.csv --odfi test-data.csv.pickle --trc 3 --vrc 4 --cc 3 --cn 7 --oc 2 --tsc 3 --tp 0.8
 Creating SelectionSet objects......Done
 Creating SelectionSet files......Done
 
@@ -191,6 +196,14 @@ To create the next set of training and validation sets, we run create_sets.py
 with the "-s 4" option to specify a starting set number of 4 to use for the
 next training and validation sets to be created.
 
+Be sure to use the same options to create_sets.py as on the first run, except
+for the count of training sets to create and the -s option, so the training and
+validation sets are created in the same way.
+
+Note that the partitioning of the original data file, via the --tp option,
+won't be the same, even when the percentage specified is the same, as that
+information is not saved across runs of create_sets.py.
+
 We also specify the number of training sets to create to be 2 (--tsc 2), since
 we want to create 5 total.
 
@@ -202,7 +215,7 @@ The last run of create_sets.py will then typically need to create fewer
 training sets, since the total number of training sets we want to create is not
 typically evenly divisble by the open file limit.
 
-$ ../create_sets.py -i test-data.csv --odfi test-data.csv.pickle --trc 3 --vrc 4 --cc 3 --cn 7 --oc 2 --tsc 3 -s 4
+$ create_sets.py -i test-data.csv --odfi test-data.csv.pickle --trc 3 --vrc 4 --cc 3 --cn 7 --oc 2 --tsc 3 -s 4 --tp 0.8
 Creating SelectionSet objects......Done
 Creating SelectionSet files......Done
 
@@ -281,7 +294,7 @@ This produces file:
 
 odfi.pickle: Has the line count and column count of test-dataset.csv.
 
-create_sets.py -i test-dataset.csv --odfi odfi.pickle --trc 2 --vrc 4 --cc 4 --cn 1 --oc 2 --tsc 4
+create_sets.py -i test-dataset.csv --odfi odfi.pickle --trc 2 --vrc 4 --cc 4 --cn 1 --oc 2 --tsc 4 --tp 0.8
 
 This produces the following files:
 
