@@ -262,8 +262,7 @@ class ValidationSet(SelectionSet):
     # sampling when creating a validation set.
     available_ordinals = None
 
-    # pylint: disable-next=too-many-arguments
-    def __init__(self, ordinal, original_column_count, args, column_set):
+    def __init__(self, file_ordinal, original_column_count, args, column_set):
 
         if ValidationSet.available_ordinals is None:
             msg = 'ValidationSet: available_ordinals has not been defined'
@@ -272,10 +271,8 @@ class ValidationSet(SelectionSet):
         SelectionSet.__init__(self)
 
         # Used for output file names and error mesages.
-        # If only one validation set is being created this is -1. If there is a
-        # validation set for each training set then this is the same ordinal as
-        # the associated training set.
-        self.ordinal = ordinal
+        # This is the same ordinal as the associated training set.
+        self.file_ordinal = file_ordinal
 
         self.row_ordinals = self.get_random_ordinals(
                                      ValidationSet.available_ordinals,
@@ -295,17 +292,13 @@ class ValidationSet(SelectionSet):
                                           original_column_count, exclude_cols)
             self.define_output_columns(args)
 
-        file_name_ordinal = ''
-        if self.ordinal != -1:
-            file_name_ordinal = f'-{ordinal}'
+        self.file_name = f'validation-set-{self.file_ordinal}'
 
-        self.file_name = f'validation-set{file_name_ordinal}'
-
-        f = f'validation-set{file_name_ordinal}-row-ordinals'
+        f = f'validation-set-{self.file_ordinal}-row-ordinals'
         self.row_ordinal_file_name = f
         self.write_ordinals(self.row_ordinals, self.row_ordinal_file_name)
 
-        f = f'validation-set{file_name_ordinal}-column-ordinals'
+        f = f'validation-set-{self.file_ordinal}-column-ordinals'
         self.column_ordinal_file_name = f
         if self.column_ordinals is not None:
             self.write_ordinals(self.column_ordinals, \
@@ -340,15 +333,13 @@ class TrainingSet(SelectionSet):
 
     The training set and and its validation set will both use the same columns
     from the original file.
-"""
+    """
 
     # The subset of row ordinals from the original data file to use for
     # sampling when creating a training set.
     available_ordinals = None
 
-    # pylint: disable-next=too-many-arguments
-    def __init__(self, trainingOrdinal, original_column_count, args,
-                 column_set):
+    def __init__(self, file_ordinal, original_column_count, args, column_set):
 
         if TrainingSet.available_ordinals is None:
             msg = 'TrainingSet: available_ordinals has not been defined'
@@ -357,9 +348,9 @@ class TrainingSet(SelectionSet):
         SelectionSet.__init__(self)
 
         # Used for output file names and error mesages.
-        self.ordinal = trainingOrdinal
+        self.file_ordinal = file_ordinal
 
-        self.validation_set = ValidationSet(self.ordinal,
+        self.validation_set = ValidationSet(self.file_ordinal,
                                             original_column_count, args,
                                             column_set)
 
@@ -372,13 +363,13 @@ class TrainingSet(SelectionSet):
 
         self.define_output_columns(args)
 
-        self.file_name = f'training-set-{trainingOrdinal}'
+        self.file_name = f'training-set-{file_ordinal}'
 
-        f = f'training-set-{trainingOrdinal}-row-ordinals'
+        f = f'training-set-{file_ordinal}-row-ordinals'
         self.row_ordinal_file_name = f
         self.write_ordinals(self.row_ordinals, self.row_ordinal_file_name)
 
-        f = f'training-set-{trainingOrdinal}-column-ordinals'
+        f = f'training-set-{file_ordinal}-column-ordinals'
         self.column_ordinal_file_name = f
 
         # pylint: disable=consider-using-with
