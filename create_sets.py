@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 
+# pylint: disable=too-many-lines
+
 """
 CBDA validation and training set creation.
 
@@ -353,6 +355,13 @@ class ValidationSet(SelectionSet):
             if os.access(self.file_name, os.R_OK):
                 os.remove(self.file_name)
 
+    def close(self):
+        """
+        Close the selection set file.
+        To be called once the selection set has been fully processed.
+        """
+        self.set_file.close()
+
 # pylint: disable=too-many-instance-attributes
 class TrainingSet(SelectionSet):
 
@@ -464,6 +473,16 @@ class TrainingSet(SelectionSet):
 
         super().check_line(ordinal, fields)
 
+    def close(self):
+        """
+        Close the selection set file, for this TraininSet and its
+        ValidaitonSet.
+
+        To be called once the selection set has been fully processed.
+        """
+        self.set_file.close()
+        self.validation_set.close()
+
 def define_and_get_args(args=None):
 
     """
@@ -473,13 +492,13 @@ def define_and_get_args(args=None):
     parser = argparse.ArgumentParser()
 
     msg = 'The file name of the original data set'
-    parser.add_argument('-i', '--original-file', dest='original_file_name', \
+    parser.add_argument('-i', '--original-file', dest='original_file_name',
                         help=msg, type=str, default=None, required=True)
 
     msg = 'The file name of the Pickle file with the original data file'
     msg += ' information.'
     parser.add_argument('--odfi', '--original-data-file-info',
-                        dest='original_data_file_info', help=msg, type=str, \
+                        dest='original_data_file_info', help=msg, type=str,
                         default=None, required=True)
 
     msg = 'The percentage of original file records to use'
@@ -489,47 +508,42 @@ def define_and_get_args(args=None):
                         help=msg, type=float, required=True)
 
     msg = 'The number of rows to extract for each training set.'
-    parser.add_argument('--trc', '--training-row-count', \
-                        dest='training_row_count', help=msg, \
+    parser.add_argument('--trc', '--training-row-count',
+                        dest='training_row_count', help=msg,
                         type=int, required=True)
 
     msg = 'The number of rows to extract for each validation set.'
-    parser.add_argument('--vrc', '--validation-row-count', \
-                        dest='validation_row_count', help=msg, \
+    parser.add_argument('--vrc', '--validation-row-count',
+                        dest='validation_row_count', help=msg,
                         type=int, required=True)
 
     msg = 'The number of columns to extract for each validation'
     msg += ' and training set.'
-    parser.add_argument('--cc', '--column-count', dest='column_count', \
+    parser.add_argument('--cc', '--column-count', dest='column_count',
                         help=msg, type=int, required=True)
 
     msg = 'The case number column ordinal'
-    parser.add_argument('--cn', '--case-column', dest='case_column', \
+    parser.add_argument('--cn', '--case-column', dest='case_column',
                         help=msg, type=int, required=True)
 
     msg = 'The outcome column ordinal'
-    parser.add_argument('--oc', '--outcome-column', dest='outcome_column', \
+    parser.add_argument('--oc', '--outcome-column', dest='outcome_column',
                         help=msg, type=int, required=True)
 
     msg = 'The number of training sets to create'
-    parser.add_argument('--tsc', '--training-set-count', \
-                        dest='training_set_count', help=msg, type=int, \
+    parser.add_argument('--tsc', '--training-set-count',
+                        dest='training_set_count', help=msg, type=int,
                         required=True)
-
-    msg = 'The starting set number'
-    parser.add_argument('-s', '--starting-set-number', \
-                        dest='starting_set_number', help=msg, type=int, \
-                        default=1)
 
     msg = 'The file name of a file with a resticted set of column ordinals'
     msg += ' to use'
-    parser.add_argument('--cs', '--column-set', dest='column_set_file_name', \
+    parser.add_argument('--cs', '--column-set', dest='column_set_file_name',
                         help=msg, type=str, default=None, required=False)
 
     msg = 'The delimiter of the original file'
-    parser.add_argument('--del', '--delimiter', \
-                        dest='delimiter', help=msg, \
-                        type=str, default=',', required=False)
+    parser.add_argument('--del', '--delimiter',
+                        dest='delimiter', help=msg, type=str, default=',',
+                        required=False)
 
     args = parser.parse_args()
     return args
@@ -804,13 +818,13 @@ def create_selection_sets(original_column_count, starting_set_number,
     selection_sets = []
 
     # Create the training sets.
-    ending_set_number = starting_set_number - 1 + args.training_set_count
+    ending_set_number = min(starting_set_number - 1 + args.training_set_count,
+                            args.training_set_count)
+
     for i in range(starting_set_number, ending_set_number + 1):
         try:
             tr_set = TrainingSet(i, original_column_count, args, column_set)
         except OSError as e:
-            print(f'\nerrno {e.errno}\n{e.strerror}\n{e.__traceback__.tb_frame}')
-            print(f'{e.__traceback__.tb_lineno} {e.__traceback__.tb_lasti}')
             if e.errno == 24:
                 # A file open error occurred.
                 if len(selection_sets) > 1:
@@ -945,6 +959,15 @@ def process_zip_file(zip_file_name, selection_sets, delimiter):
             print(msg)
             sys.exit(1)
 
+def close_selection_sets(selection_sets):
+
+    """
+    Close the open file for each selection set.
+    """
+
+    for selset in selection_sets:
+        selset.close()
+
 def program_start():
     """
     The main function for the program.
@@ -972,22 +995,35 @@ def program_start():
 
     define_available_ordinals(original_line_count, args)
 
-    # Create SelectionSet objects.
-    (selection_sets, ending_set_number) = create_selection_sets(
-                                              original_column_count,
-                                              args.starting_set_number, args,
-                                              column_set)
+    # Process the original file using as many passes as necessary,
+    # given the system limit on the macimum number of open files.
+    starting_set_number = 1
+    ending_set_number = 0
+    file_pass_count = 0
+    while ending_set_number < args.training_set_count:
 
-    msg = 'Creating SelectionSet files {} to {} ...'
-    print(msg.format(args.starting_set_number, ending_set_number), end='')
-    if args.original_file_name.endswith('.zip'):
-        process_zip_file(args.original_file_name, selection_sets,
-                         args.delimiter)
-    else:
-        process_regular_file(args.original_file_name, selection_sets,
+        file_pass_count += 1
+        print(f'\nPerforming pass {file_pass_count} of {args.original_file_name}')
+
+        # Create as many SelectionSet objects as allowed by the
+        # system limit on number of open files.
+        (selection_sets, ending_set_number) = create_selection_sets(
+                                                  original_column_count,
+                                                  starting_set_number, args,
+                                                  column_set)
+
+        msg = 'Creating SelectionSet files {} to {} ...'
+        print(msg.format(starting_set_number, ending_set_number), end='')
+        if args.original_file_name.endswith('.zip'):
+            process_zip_file(args.original_file_name, selection_sets,
                              args.delimiter)
+        else:
+            process_regular_file(args.original_file_name, selection_sets,
+                                 args.delimiter)
+        close_selection_sets(selection_sets)
+        print('...Done')
 
-    print('...Done')
+        starting_set_number = ending_set_number + 1
 
 if __name__ == '__main__':
     program_start()

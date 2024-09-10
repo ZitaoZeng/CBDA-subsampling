@@ -95,24 +95,26 @@ attribute column ordinals to include for a training or validation set, but it
 does write those columns to each training set and each validation set, in
 addition to the randomly selected attribute columns.
 
-It makes a single pass of the original data set to create all the validation
-and training sets. If creating 500 training sets, which also means creating 500
-validation sets (one for each training set) it takes one pass of the original
-data set, not 1,000 passes.
+It makes as few passes as possible of the original data set to create all the
+validation and training sets. The number of passes of the original data set is
+determined by the system limit on the maximum number of open files.
 
-This is limited by the maximum number of open files a user or user process can
-have on a system, which is usually around 1,020 on a Linux system. If creating
-more than that number files (number of training sets + number of validation
-sets), see section "Multiple Runs" below.
+Suppose the system file open limit is 1020 (a common value on Linux systems).
+If creating 500 training sets, which also means creating 500 validation sets
+(one for each training set), so 1000 files in total, it takes one pass of the
+original data set, not 1,000 passes. If creating 1000 training sets, which also
+means creating 1000 validation sets, so 2000 files in total, it takes two
+passes, 510 training sets and 510 validation sets on the first pass, and 490 of
+each on the second pass.
 
 This script produces the following files.
 
 3 files for each validation set:
 
-validation-set-i:
+validation-set-i.csv:
 
 	The validation set data, the randomly selected rows and columns (plus the case
-	number and outcome column). Ex. validation-set-1, validation-set-2, etc.
+	number and outcome column). Ex. validation-set-1.csv, validation-set-2.csv, etc.
 
     The first column is the case number column.
     The second column is the outcome column.
@@ -134,10 +136,10 @@ validation-set-i-column-ordinals:
 
 2 files for each training set:
 
-training-set-i:
+training-set-i.csv:
 
 	The training set data, the randomly selected row and columns (plus the case
-	number and outcome column). Ex. training-set-1, training-set-2, etc.
+	number and outcome column). Ex. training-set-1.csv, training-set-2.csv, etc.
 
     The first column is the case number column.
     The second column is the outcome column.
@@ -152,101 +154,6 @@ training-set-i-row-ordinals:
 
 There is no file for training set column ordinals, because a training set uses
 the same columns as its validation set.
-
-=============
-Multiple Runs
-=============
-
-As noted above there is a maximum number of open files a user or user process
-can have on a system, which is usually around 1,020 on a Linux system.
-
-To handle this create_sets.py can be run multiple times to create the full
-number of training and validation sets. 
-
-Here's an example of creating 5 training sets in two runs. This is much less
-than a system file open limit, but the process is the same.
-
-We do the first create_sets.py run to create the first 3 training sets, each
-with its own validation set.
-
-$ create_sets.py -i test-data.csv --odfi test-data.csv.pickle --trc 3 --vrc 4 --cc 3 --cn 7 --oc 2 --tsc 3 --tp 0.8
-Creating SelectionSet objects......Done
-Creating SelectionSet files......Done
-
-This results in the 3 training sets and a validation set for each.
-ls -v | cat
-
-training-set-1
-training-set-1-row-ordinals
-training-set-2
-training-set-2-row-ordinals
-training-set-3
-training-set-3-row-ordinals
-validation-set-1
-validation-set-1-column-ordinals
-validation-set-1-row-ordinals
-validation-set-2
-validation-set-2-column-ordinals
-validation-set-2-row-ordinals
-validation-set-3
-validation-set-3-column-ordinals
-validation-set-3-row-ordinals
-
-To create the next set of training and validation sets, we run create_sets.py
-with the "-s 4" option to specify a starting set number of 4 to use for the
-next training and validation sets to be created.
-
-Be sure to use the same options to create_sets.py as on the first run, except
-for the count of training sets to create and the -s option, so the training and
-validation sets are created in the same way.
-
-Note that the partitioning of the original data file, via the --tp option,
-won't be the same, even when the percentage specified is the same, as that
-information is not saved across runs of create_sets.py.
-
-We also specify the number of training sets to create to be 2 (--tsc 2), since
-we want to create 5 total.
-
-Typically when dealing with the open file limit, each run of create_sets.py,
-except the last, will create the same number of training sets  - something
-close to or at the open file limit.
-
-The last run of create_sets.py will then typically need to create fewer
-training sets, since the total number of training sets we want to create is not
-typically evenly divisble by the open file limit.
-
-$ create_sets.py -i test-data.csv --odfi test-data.csv.pickle --trc 3 --vrc 4 --cc 3 --cn 7 --oc 2 --tsc 3 -s 4 --tp 0.8
-Creating SelectionSet objects......Done
-Creating SelectionSet files......Done
-
-This results in the 2 additional training and validation sets, numbered from 4 to 5.
-
-$ ls -v | cat
-training-set-1
-training-set-1-row-ordinals
-training-set-2
-training-set-2-row-ordinals
-training-set-3
-training-set-3-row-ordinals
-training-set-4
-training-set-4-row-ordinals
-training-set-5
-training-set-5-row-ordinals
-validation-set-1
-validation-set-1-column-ordinals
-validation-set-1-row-ordinals
-validation-set-2
-validation-set-2-column-ordinals
-validation-set-2-row-ordinals
-validation-set-3
-validation-set-3-column-ordinals
-validation-set-3-row-ordinals
-validation-set-4
-validation-set-4-column-ordinals
-validation-set-4-row-ordinals
-validation-set-5
-validation-set-5-column-ordinals
-validation-set-5-row-ordinals
 
 ********************
 create_test_data_set
@@ -298,31 +205,31 @@ create_sets.py -i test-dataset.csv --odfi odfi.pickle --trc 2 --vrc 4 --cc 4 --c
 
 This produces the following files:
 
-training-set-1
+training-set-1.csv
 training-set-1-row-ordinals
 
-training-set-2
+training-set-2.csv
 training-set-2-row-ordinals
 
-training-set-3
+training-set-3.csv
 training-set-3-row-ordinals
 
-training-set-4
+training-set-4.csv
 training-set-4-row-ordinals
 
-validation-set-1
+validation-set-1.csv
 validation-set-1-column-ordinals
 validation-set-1-row-ordinals
 
-validation-set-2
+validation-set-2.csv
 validation-set-2-column-ordinals
 validation-set-2-row-ordinals
 
-validation-set-3
+validation-set-3.csv
 validation-set-3-column-ordinals
 validation-set-3-row-ordinals
 
-validation-set-4
+validation-set-4.csv
 validation-set-4-column-ordinals
 validation-set-4-row-ordinals
 
