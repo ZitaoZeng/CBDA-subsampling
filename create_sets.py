@@ -501,24 +501,45 @@ def define_and_get_args(args=None):
                         dest='original_data_file_info', help=msg, type=str,
                         default=None, required=True)
 
+
+    # Start exclusive group.
+    # Creating training/validation sets and creating generic sets are mutually
+    # exclusive, but it is required to specify one.
+    group = parser.add_mutually_exclusive_group(required=True)
+
+    msg = 'The number of generic sets to create'
+    group.add_argument('--gsc', '--generic-set-count',
+                        dest='generic_set_count', help=msg, type=int)
+
+    msg = 'The number of training sets to create'
+    group.add_argument('--tsc', '--training-set-count',
+                        dest='training_set_count', help=msg, type=int)
+    # End exclusive group.
+
+    msg = 'The number of rows to extract for each generic set.'
+    parser.add_argument('--grc', '--generic-row-count',
+                        dest='generic_row_count', help=msg,
+                        type=int)
+
     msg = 'The percentage of original file records to use'
     msg += ' for sampling training sets. The remaining record to use for'
     msg += ' sampling validation sets.'
     parser.add_argument('--tp', '--training-percent', dest='training_percent',
-                        help=msg, type=float, required=True)
+                        help=msg, type=float)
 
     msg = 'The number of rows to extract for each training set.'
     parser.add_argument('--trc', '--training-row-count',
-                        dest='training_row_count', help=msg,
-                        type=int, required=True)
+                        dest='training_row_count', help=msg, type=int)
 
     msg = 'The number of rows to extract for each validation set.'
     parser.add_argument('--vrc', '--validation-row-count',
-                        dest='validation_row_count', help=msg,
-                        type=int, required=True)
+                        dest='validation_row_count', help=msg, type=int)
 
+
+    # This required whether creating training/validation sets or creating
+    # generic sets.
     msg = 'The number of columns to extract for each validation'
-    msg += ' and training set.'
+    msg += ' and training set or for each generic set.'
     parser.add_argument('--cc', '--column-count', dest='column_count',
                         help=msg, type=int, required=True)
 
@@ -529,11 +550,6 @@ def define_and_get_args(args=None):
     msg = 'The outcome column ordinal'
     parser.add_argument('--oc', '--outcome-column', dest='outcome_column',
                         help=msg, type=int, required=True)
-
-    msg = 'The number of training sets to create'
-    parser.add_argument('--tsc', '--training-set-count',
-                        dest='training_set_count', help=msg, type=int,
-                        required=True)
 
     msg = 'The file name of a file with a resticted set of column ordinals'
     msg += ' to use'
@@ -548,14 +564,13 @@ def define_and_get_args(args=None):
     args = parser.parse_args()
     return args
 
-# pylint: disable-next=too-many-statements
-def check_args(args=None):
-
+def check_file_args(args, args_ok):
     """
-    Perform validity checks on the command line arguments.
-    """
+    Check the program arguments that are input file names.
 
-    args_ok = True
+    These are needed whether we are creating training/validation sets or
+    creating generic sets.
+    """
 
     if not os.path.isfile(args.original_file_name):
         msg = '\nOriginal data set file "{0}" does not exist.\n'
@@ -569,22 +584,142 @@ def check_args(args=None):
         print(msg)
         args_ok = False
 
-    if args.training_percent <= 0.0 or args.training_percent >= 1.0:
+    return args_ok
+
+def check_unallowed_arg(set_type, arg_val, arg_name, args_ok):
+
+    """
+    Check an argument for being specified when it shouldn't be.
+
+    set_type is the type of sets being created, ex. generic or
+    training/validation. For error messages.
+
+    arg_val is the argument value. If not None it is considered specified.
+    Note that this won't work if an argument has a default value.
+
+    arg_name is the name of the argument, for error messages.
+
+    args_ok is the current argument check state. This is set to False if
+    the argument was specified.
+    """
+
+    if arg_val is not None:
+        msg = 'Creating {} sample sets was specified but {} was'
+        msg += ' specified with value {}.'
+        print(msg.format(set_type, arg_name, arg_val))
+        args_ok = False
+
+    return args_ok
+
+def check_required_arg(set_type, arg_val, arg_name, args_ok):
+
+    """
+    Check an argument for being not specified when it should be.
+
+    set_type is the type of sets being created, ex. generic or
+    training/validation. For error messages.
+
+    arg_val is the argument value. If None it is considered unspecified.
+    Note that this won't work if an argument has a default value.
+
+    arg_name is the name of the argument, for error messages.
+
+    args_ok is the current argument check state. This is set to False if
+    the argument was not specified.
+    """
+
+    if arg_val is None:
+        msg = 'Creating {} sample sets was specified but {} was'
+        msg += ' not specified.'
+        print(msg.format(set_type, arg_name, arg_val))
+        args_ok = False
+
+    return args_ok
+
+def check_generic_args(args, args_ok):
+
+    """
+    Creating generic sets is mutually exclusive with creating
+    training/validation sets.
+    """
+
+    args_ok = check_required_arg('generic', args.generic_row_count,
+                                 'generic_row_count', args_ok)
+
+    if args.generic_row_count is not None and  args.generic_row_count < 1:
+        msg = 'The generic row count, {0}, is less than 1.'
+        msg = msg.format(args.training_row_count)
+        print(msg)
+        args_ok = False
+
+    args_ok = check_unallowed_arg('generic', args.training_percent,
+                                  'training_percent', args_ok)
+
+    args_ok = check_unallowed_arg('generic', args.training_row_count,
+                                  'training_row_count', args_ok)
+
+    args_ok = check_unallowed_arg('generic', args.validation_row_count,
+                                  'validation_row_count', args_ok)
+
+    args_ok = check_unallowed_arg('generic', args.column_set_file_name,
+                                  'column_set_file_name', args_ok)
+
+    return args_ok
+
+def check_training_args(args, args_ok):
+    """
+    Creating training/validation sets is mutually exclusive with creating
+    generic sets.
+    """
+
+    args_ok = check_required_arg('training/validation', args.training_percent,
+                                 'training_percent', args_ok)
+
+    if (args.training_percent is not None and
+        (args.training_percent <= 0.0 or args.training_percent >= 1.0)):
+
         msg = 'Training percent should between 0 and 1, exclusive, i.e. (0,1).\n'
         print(msg)
         args_ok = False
 
-    if args.training_row_count < 1:
+    args_ok = check_required_arg('training/validation', args.training_row_count,
+                                 'training_row_count', args_ok)
+
+    if args.training_row_count is not None and args.training_row_count < 1:
         msg = 'The training row count, {0}, is less than 1.'
         msg = msg.format(args.training_row_count)
         print(msg)
         args_ok = False
 
-    if args.validation_row_count < 1:
+    args_ok = check_required_arg('training/validation', args.validation_row_count,
+                                 'validation_row_count', args_ok)
+
+    if args.validation_row_count is not None and args.validation_row_count < 1:
         msg = 'The validation row count, {0}, is less than 1.'
         msg = msg.format(args.validation_row_count)
         print(msg)
         args_ok = False
+
+    args_ok = check_unallowed_arg('training/validation', args.generic_row_count,
+                                  'generic_row_count', args_ok)
+
+    return args_ok
+
+# pylint: disable-next=too-many-statements
+def check_args(args):
+
+    """
+    Perform validity checks on the command line arguments.
+    """
+
+    args_ok = True
+
+    args_ok = check_file_args(args, args_ok)
+
+    if args.generic_set_count is not None:
+        args_ok = check_generic_args(args, args_ok)
+    else:
+        args_ok = check_training_args(args, args_ok)
 
     if args.column_count < 1:
         msg = 'The column count, {0}, is less than 1.'
@@ -608,12 +743,6 @@ def check_args(args=None):
         msg = 'The case number column ordinal and outcome column are the'
         msg += ' same, {0}'
         msg = msg.format(args.case_column)
-        print(msg)
-        args_ok = False
-
-    if args.starting_set_number < 1:
-        msg = 'The starting_set_number, {0}, is less than 1.'
-        msg = msg.format(args.starting_set_number)
         print(msg)
         args_ok = False
 
@@ -649,19 +778,23 @@ def print_args(args):
     msg = 'args.original_data_file_info: {0}'
     print(msg.format(args.original_data_file_info))
 
-    print(f'args.training_percent: {args.training_percent}')
+    if args.generic_set_count is not None:
+        # Print the generic set specific arguments.
+        print(f'args.generic_row_count: {args.generic_row_count}')
+    else:
+        # Print the training/validation set specific arguments.
+        print(f'args.training_percent: {args.training_percent}')
+        print(f'args.training_row_count: {args.training_row_count}')
 
-    print(f'args.training_row_count: {args.training_row_count}')
+        msg = 'args.validation_row_count: {0}'
+        print(msg.format(args.validation_row_count))
 
-    msg = 'args.validation_row_count: {0}'
-    print(msg.format(args.validation_row_count))
+        print(f'args.training_set_count: {args.training_set_count}')
+        print(f'args.column_set_file_name: {args.column_set_file_name}')
 
-    print(f'args.column_count: {args.column_count}')
     print(f'args.case_column: {args.case_column}')
     print(f'args.outcome_column: {args.outcome_column}')
-    print(f'args.training_set_count: {args.training_set_count}')
-    print(f'args.starting_set_number: {args.starting_set_number}')
-    print(f'args.column_set_file_name: {args.column_set_file_name}')
+    print(f'args.column_count: {args.column_count}')
     print(f'args.delimiter: {args.delimiter}')
 
     print('')
@@ -979,8 +1112,9 @@ def program_start():
      not bound to a class object).
     """
 
-    args = define_and_get_args()
-    #print_args(args)
+    args = define_and_check_args()
+    print_args(args)
+    #sys.exit(0)
 
     # Load the original file info.
     with open(args.original_data_file_info, 'rb') as odi_file:
