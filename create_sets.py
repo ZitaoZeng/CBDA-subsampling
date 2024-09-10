@@ -299,7 +299,7 @@ class ValidationSet(SelectionSet):
                                           original_column_count, exclude_cols)
             self.define_output_columns(args)
 
-        self.file_name = f'validation-set-{self.file_ordinal}'
+        self.file_name = f'validation-set-{self.file_ordinal}.csv'
 
         f = f'validation-set-{self.file_ordinal}-row-ordinals'
         self.row_ordinal_file_name = f
@@ -409,7 +409,7 @@ class TrainingSet(SelectionSet):
 
         self.define_output_columns(args)
 
-        self.file_name = f'training-set-{file_ordinal}'
+        self.file_name = f'training-set-{file_ordinal}.csv'
 
         f = f'training-set-{file_ordinal}-row-ordinals'
         self.row_ordinal_file_name = f
