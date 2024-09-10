@@ -705,7 +705,6 @@ def check_training_args(args, args_ok):
 
     return args_ok
 
-# pylint: disable-next=too-many-statements
 def check_args(args):
 
     """
