@@ -270,6 +270,13 @@ class ValidationSet(SelectionSet):
 
         SelectionSet.__init__(self)
 
+        # Define these file items as None so the cleanup function can be
+        # called to cleanup up any open or created files if a file exception
+        # occurs part was through the constructor.
+        self.row_ordinal_file_name = None
+        self.column_ordinal_file_name = None
+        self.set_file = None
+
         # Used for output file names and error mesages.
         # This is the same ordinal as the associated training set.
         self.file_ordinal = file_ordinal
@@ -296,22 +303,55 @@ class ValidationSet(SelectionSet):
 
         f = f'validation-set-{self.file_ordinal}-row-ordinals'
         self.row_ordinal_file_name = f
-        self.write_ordinals(self.row_ordinals, self.row_ordinal_file_name)
+
+        try:
+            self.write_ordinals(self.row_ordinals, self.row_ordinal_file_name)
+        except OSError as e:
+            self.cleanup()
+            raise e
 
         f = f'validation-set-{self.file_ordinal}-column-ordinals'
         self.column_ordinal_file_name = f
         if self.column_ordinals is not None:
-            self.write_ordinals(self.column_ordinals, \
-                                self.column_ordinal_file_name)
+            try:
+                self.write_ordinals(self.column_ordinals,
+                                    self.column_ordinal_file_name)
+            except OSError as e:
+                self.cleanup()
+                raise e
 
-        self.open_set_file()
-
-    def open_set_file(self):
-        """
-        Open the set's output file.
-        """
         # pylint: disable=consider-using-with
-        self.set_file = open(self.file_name, 'w', encoding='utf_8')
+        try:
+            self.set_file = open(self.file_name, 'w', encoding='utf_8')
+        except OSError as e:
+            self.cleanup()
+            raise e
+
+    def cleanup(self):
+
+        """
+        Cleanup any files created by this ValidationSet.
+
+        Called when the constructor detects a file error creating one of
+        these files or when the owning TrainingSet contruction failed, in
+        either case typically due to a file open failure because of too many
+        open files.
+        """
+
+        if (self.row_ordinal_file_name is not None and
+                os.access(self.row_ordinal_file_name, os.R_OK)):
+            os.remove(self.row_ordinal_file_name)
+
+        if (self.column_ordinal_file_name is not None and
+                os.access(self.column_ordinal_file_name, os.R_OK)):
+            os.remove(self.column_ordinal_file_name)
+
+        if self.set_file is not None:
+            if not self.set_file.closed:
+                self.set_file.close()
+
+            if os.access(self.file_name, os.R_OK):
+                os.remove(self.file_name)
 
 # pylint: disable=too-many-instance-attributes
 class TrainingSet(SelectionSet):
@@ -347,6 +387,12 @@ class TrainingSet(SelectionSet):
 
         SelectionSet.__init__(self)
 
+        # Define these file items as None so the cleanup function can be
+        # called to cleanup up any open or created files if a file exception
+        # occurs part was through the constructor.
+        self.row_ordinal_file_name = None
+        self.set_file = None
+
         # Used for output file names and error mesages.
         self.file_ordinal = file_ordinal
 
@@ -367,13 +413,42 @@ class TrainingSet(SelectionSet):
 
         f = f'training-set-{file_ordinal}-row-ordinals'
         self.row_ordinal_file_name = f
-        self.write_ordinals(self.row_ordinals, self.row_ordinal_file_name)
 
-        f = f'training-set-{file_ordinal}-column-ordinals'
-        self.column_ordinal_file_name = f
+        try:
+            self.write_ordinals(self.row_ordinals, self.row_ordinal_file_name)
+        except OSError as e:
+            self.cleanup()
+            raise e
 
         # pylint: disable=consider-using-with
-        self.set_file = open(self.file_name, 'w', encoding='utf_8')
+        try:
+            self.set_file = open(self.file_name, 'w', encoding='utf_8')
+        except OSError as e:
+            self.cleanup()
+            raise e
+
+    def cleanup(self):
+
+        """
+        Cleanup any files created by this TrainingSet, including any by its
+        associated ValidationSet.
+
+        Called when the TrainingSet contruction failed, typically due to
+        a file open failure because of too many open files.
+        """
+
+        if (self.row_ordinal_file_name is not None and
+                os.access(self.row_ordinal_file_name, os.R_OK)):
+            os.remove(self.row_ordinal_file_name)
+
+        if self.set_file is not None:
+            if not self.set_file.closed:
+                self.set_file.close()
+
+            if os.access(self.file_name, os.R_OK):
+                os.remove(self.file_name)
+
+        self.validation_set.cleanup()
 
     def check_line(self, ordinal, fields):
 
@@ -718,7 +793,8 @@ def define_available_ordinals(original_line_count, args):
     TrainingSet.available_ordinals = data_ordinals[0:training_ordinal_count]
     ValidationSet.available_ordinals = data_ordinals[training_ordinal_count:]
 
-def create_selection_sets(original_column_count, args, column_set):
+def create_selection_sets(original_column_count, starting_set_number,
+                          args, column_set):
 
     """
     Create the validation set and training set objects.
@@ -728,11 +804,32 @@ def create_selection_sets(original_column_count, args, column_set):
     selection_sets = []
 
     # Create the training sets.
-    ending_set_number = args.starting_set_number - 1 + args.training_set_count
-    for i in range(args.starting_set_number, ending_set_number + 1):
+    ending_set_number = starting_set_number - 1 + args.training_set_count
+    for i in range(starting_set_number, ending_set_number + 1):
         try:
             tr_set = TrainingSet(i, original_column_count, args, column_set)
-            selection_sets.append(tr_set)
+        except OSError as e:
+            print(f'\nerrno {e.errno}\n{e.strerror}\n{e.__traceback__.tb_frame}')
+            print(f'{e.__traceback__.tb_lineno} {e.__traceback__.tb_lasti}')
+            if e.errno == 24:
+                # A file open error occurred.
+                if len(selection_sets) > 1:
+                    # Probably attempted to open too many files.
+                    # On this pass of the original file process the training
+                    # sets successfully opened.
+                    ending_set_number = i - 1
+                    break
+
+                msg = 'A file open exception occured creating TrainingSet'
+                msg +=' {0} of {1}:\n{2}'
+                msg = msg.format(i, args.training_set_count, e)
+                print(msg)
+                sys.exit(1)
+            else:
+                msg = 'An OSError exception occured creating TrainingSet {0} of {1}:\n{2}'
+                msg = msg.format(i, args.training_set_count, e)
+                print(msg)
+                sys.exit(1)
         # pylint: disable=broad-exception-caught
         except Exception as e:
             msg = 'An exception occured creating TrainingSet {0} of {1}:\n{2}'
@@ -740,8 +837,10 @@ def create_selection_sets(original_column_count, args, column_set):
             print(msg)
             sys.exit(1)
 
+        selection_sets.append(tr_set)
+
     print('...Done')
-    return selection_sets
+    return selection_sets, ending_set_number
 
 def process_original_file(input_file, selection_sets, delimiter):
 
@@ -874,10 +973,13 @@ def program_start():
     define_available_ordinals(original_line_count, args)
 
     # Create SelectionSet objects.
-    selection_sets = create_selection_sets(original_column_count, args,
-                                           column_set)
+    (selection_sets, ending_set_number) = create_selection_sets(
+                                              original_column_count,
+                                              args.starting_set_number, args,
+                                              column_set)
 
-    print('Creating SelectionSet files...', end='')
+    msg = 'Creating SelectionSet files {} to {} ...'
+    print(msg.format(args.starting_set_number, ending_set_number), end='')
     if args.original_file_name.endswith('.zip'):
         process_zip_file(args.original_file_name, selection_sets,
                          args.delimiter)
