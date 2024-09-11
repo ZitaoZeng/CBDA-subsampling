@@ -107,6 +107,7 @@ import argparse
 import os
 import pickle
 import random
+from contextlib import contextmanager
 import zipfile
 
 class SelectionSet:
@@ -1136,56 +1137,76 @@ def process_original_file(input_file, selection_sets, delimiter):
         for sel_set in selection_sets:
             sel_set.check_line(ordinal, line_fields)
 
-def process_regular_file(regular_file_name, selection_sets, delimiter):
+@contextmanager
+def get_original_file_object(original_file_name):
+    """
+    Get and return a file object to the original data file,
+    even if it is in a zip file.
+
+    This function is decorated as a contextmanager, so it can be used in
+    a with statement:
+    with get_original_file_object(some_file_name) as input_file:
+        process input_file
+    """
+
+    if original_file_name.endswith('.zip'):
+        zip_file, regular_file = get_original_from_zip(original_file_name)
+        try:
+            yield regular_file
+        finally:
+            regular_file.close()
+            zip_file.close()
+    else:
+        regular_file = open(original_file_name, 'r', encoding='utf_8')
+        try:
+            yield regular_file
+        finally:
+            regular_file.close()
+
+def get_original_from_zip(zip_file_name):
 
     """
-    Process an unzipped original file.
-    """
+    Get a file object for reading the original file from zip file.
 
-    with open(regular_file_name, 'r', encoding='utf_8') as input_file:
-        process_original_file(input_file, selection_sets, delimiter)
-
-def process_zip_file(zip_file_name, selection_sets, delimiter):
-
-    """
-    Process an zipped original file.
-
-    The csv file in the zip file is read directly from the zip archive,
+    The csv file in the zip file will be read directly from the zip archive,
     without having to extract it.
 
     The regular file name is assumed to be the same as the zip file name
     but ending with ".csv" instead of ".zip" and no path.
     """
 
-    with zipfile.ZipFile(zip_file_name, 'r') as zfile:
+    # pylint: disable=consider-using-with
+    zfile = zipfile.ZipFile(zip_file_name, 'r')
 
 
-        # Delete the path, everything up to the last '/', if there is one.
-        regular_file_name = zip_file_name
-        slash_index = regular_file_name.rfind('/')
-        if slash_index > 0:
-            regular_file_name = regular_file_name[slash_index+1:]
+    # Delete the path, everything up to the last '/', if there is one.
+    regular_file_name = zip_file_name
+    slash_index = regular_file_name.rfind('/')
+    if slash_index > 0:
+        regular_file_name = regular_file_name[slash_index+1:]
 
-        # Change the suffix from 'zip' to 'csv'. Don't use rstrip. it should
-        # work, but it doesn't remove a specific string, but any sequence of
-        # characters in that string.  'abc.pizzip'.rstrip('zip') results in
-        # 'abc.'. String function replace would replace all occurences of
-        # 'zip', ex.  'zip-of-abc.zip'.replace('zip', 'csv') becomes
-        # 'csv-of-abc.csv'. String function removesuffix isn't available before
-        # Python3 version 3.9, so it isn't always available on all production
-        # systems.
-        regular_file_name = regular_file_name[:-3] + 'csv'
-        #print(f'regular_file_name {regular_file_name}')
+    # Change the suffix from 'zip' to 'csv'. Don't use rstrip. it should
+    # work, but it doesn't remove a specific string, but any sequence of
+    # characters in that string.  'abc.pizzip'.rstrip('zip') results in
+    # 'abc.'. String function replace would replace all occurences of
+    # 'zip', ex.  'zip-of-abc.zip'.replace('zip', 'csv') becomes
+    # 'csv-of-abc.csv'. String function removesuffix isn't available before
+    # Python3 version 3.9, so it isn't always available on all production
+    # systems.
+    regular_file_name = regular_file_name[:-3] + 'csv'
+    #print(f'regular_file_name {regular_file_name}')
 
-        try:
-            with zfile.open(regular_file_name) as input_file:
-                process_original_file(input_file, selection_sets, delimiter)
-        except IOError as e:
-            msg = '\nThe following exception occured opening'
-            msg += ' zip file member {} from zip file {}\n{}'
-            msg = msg.format(regular_file_name, zip_file_name, e)
-            print(msg)
-            sys.exit(1)
+    try:
+        # pylint: disable=consider-using-with
+        regular_file = zfile.open(regular_file_name)
+    except IOError as e:
+        msg = '\nThe following exception occured opening'
+        msg += ' zip file member {} from zip file {}\n{}'
+        msg = msg.format(regular_file_name, zip_file_name, e)
+        print(msg)
+        sys.exit(1)
+
+    return zfile, regular_file
 
 def close_selection_sets(selection_sets):
 
@@ -1231,23 +1252,28 @@ def program_start():
         file_pass_count += 1
         print(f'\nPerforming pass {file_pass_count} of {args.original_file_name}')
 
-        # Create as many SelectionSet objects as allowed by the
-        # system limit on number of open files.
-        (selection_sets, ending_set_number) = create_selection_sets(
-                                                  original_line_count,
-                                                  original_column_count,
-                                                  starting_set_number, args,
-                                                  column_set)
+        # Get a file object to the original file, open for reading.
+        # This must come before creating the selection sets to avoid a
+        # "too many open files" error. If the creation of the selection sets
+        # uses up the available open files, then attempting to open the
+        # original file would cauase a "too many open files" error. Opening
+        # the original file first accounts for that open file, then we can
+        # open as many selection sets as allowed from the remaining open file
+        # slots.
+        with get_original_file_object(args.original_file_name) as input_file:
 
-        print(f'len(selection_sets) {len(selection_sets)}')
-        msg = 'Creating SelectionSet files {} to {} ...'
-        print(msg.format(starting_set_number, ending_set_number), end='')
-        if args.original_file_name.endswith('.zip'):
-            process_zip_file(args.original_file_name, selection_sets,
-                             args.delimiter)
-        else:
-            process_regular_file(args.original_file_name, selection_sets,
-                                 args.delimiter)
+            # Create as many SelectionSet objects as allowed by the
+            # system limit on number of open files.
+            (selection_sets, ending_set_number) = create_selection_sets(
+                                                      original_line_count,
+                                                      original_column_count,
+                                                      starting_set_number, args,
+                                                      column_set)
+
+            msg = 'Creating SelectionSet files {} to {} ...'
+            print(msg.format(starting_set_number, ending_set_number), end='')
+            process_original_file(input_file, selection_sets, args.delimiter)
+
         close_selection_sets(selection_sets)
         print('...Done')
 

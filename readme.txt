@@ -32,6 +32,11 @@ value between 0 and 1), by a command line option (--tp) to script
 create_sets.py. The remaining row if the original file are used for creating
 the validation sets.
 
+A set of generic samples can also be created instead of pairs of training and
+validation sets.  This creates the specified number of files sampled from the
+original data file. See the Examples section below for an example of how to do
+this.
+
 There are 4 scripts in this part of the CBDA project, 3 Python3 scripts and 1
 bash script. For the Python scripts use the "-h" command line option to see the
 command line options for running the script.
@@ -82,21 +87,22 @@ standard output. Useful for testing and debugging the Python scripts.
 create_sets.py
 **************
 
-This creates the validation set(s) and training sets. It reads the Pickle file
-produced by get_original_file_info.py and the original data file.  It uses
-command line options for the number of rows and columns to include in each
-validation and training set, the column ordinals for the case number and
-outcome columns, the number of training sets to produce and the percentage (a
-value betwen 0 and 1) of the original data file lines to use for training sets
-(with the remainder of the original data file lines used for validation sets).
+This creates the validation set(s) and training sets or generic sets. It reads
+the Pickle file produced by get_original_file_info.py and the original data
+file.  It uses command line options for the number of rows and columns to
+include in each validation and training set or each generic set, the column
+ordinals for the case number and outcome columns, the number of training or
+generic sets to produce and for training sets the percentage (a value betwen 0
+and 1) of the original data file lines to use for training sets (with the
+remainder of the original data file lines used for validation sets).
 
 It excludes the case number and outcome column from the randomly selected
 attribute column ordinals to include for a training or validation set, but it
-does write those columns to each training set and each validation set, in
-addition to the randomly selected attribute columns.
+does write those columns to each training set and each validation set or to
+each generic set, in addition to the randomly selected attribute columns.
 
 It makes as few passes as possible of the original data set to create all the
-validation and training sets. The number of passes of the original data set is
+resulting sets. The number of passes of the original data set is
 determined by the system limit on the maximum number of open files.
 
 Suppose the system file open limit is 1024 (a common value on Linux systems).
@@ -108,7 +114,8 @@ sets, which also means creating 1000 validation sets, so 2000 files in total,
 it takes two passes, 510 training sets and 510 validation sets on the first
 pass, and 490 of each on the second pass.
 
-This script produces the following files.
+When creating training and validation sets, this script produces the following
+files.
 
 3 files for each validation set:
 
@@ -156,6 +163,31 @@ training-set-i-row-ordinals:
 There is no file for training set column ordinals, because a training set uses
 the same columns as its validation set.
 
+When creating generic sets, this script produces the following files.
+
+3 files for each generic set:
+
+set-i.csv:
+
+	The generic set data, the randomly selected rows and columns (plus the case
+	number and outcome column). Ex. set-1.csv, set-2.csv, etc.
+
+    The first column is the case number column.
+    The second column is the outcome column.
+    The remaining columns are the randomly selected columns, in the order they
+    appear in the original file.
+
+set-i-row-ordinals:
+
+	The	row ordinals in the original data file for the rows in the generic
+	set data.
+
+set-i-column-ordinals:
+
+	The	column ordinals in the original data file for the columns in the
+	generic set data, not including the case number or outcome column
+	ordinals.
+
 ********************
 create_test_data_set
 ********************
@@ -202,7 +234,19 @@ This produces file:
 
 odfi.pickle: Has the line count and column count of test-dataset.csv.
 
-create_sets.py -i test-dataset.csv --odfi odfi.pickle --trc 2 --vrc 4 --cc 4 --cn 1 --oc 2 --tsc 4 --tp 0.8
+The contents of odfi.pickle can be displyed:
+
+$ list_original_file_info.py --odfi test-data.csv.pickle
+originalLineCount: 21
+originalColumnCount: 20
+
+odfi.pickle can be used repeatedly for multiple runs of create_sets.py.
+
+------------------------------------------------
+Example 1: creating training and validation sets
+------------------------------------------------
+
+create_sets.py -i test-dataset.csv --odfi odfi.pickle --trc 2 --vrc 4 --cc 4 --cn 1 --oc 2 --sc 4 --tp 0.8
 
 This produces the following files:
 
@@ -233,6 +277,24 @@ validation-set-3-row-ordinals
 validation-set-4.csv
 validation-set-4-column-ordinals
 validation-set-4-row-ordinals
+
+--------------------------------
+Example 2: creating generic sets
+--------------------------------
+
+$ create_sets.py -i test-data.csv --odfi test-data.csv.pickle --grc 2 --cc 4 --cn 7 --oc 2 --sc 3
+
+set-1.csv
+set-1-column-ordinals
+set-1-row-ordinals
+
+set-2.csv
+set-2-column-ordinals
+set-2-row-ordinals
+
+set-3.csv
+set-3-column-ordinals
+set-3-row-ordinals
 
 *****************
 Programming Notes
