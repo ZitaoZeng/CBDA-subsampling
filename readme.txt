@@ -99,13 +99,14 @@ It makes as few passes as possible of the original data set to create all the
 validation and training sets. The number of passes of the original data set is
 determined by the system limit on the maximum number of open files.
 
-Suppose the system file open limit is 1020 (a common value on Linux systems).
-If creating 500 training sets, which also means creating 500 validation sets
-(one for each training set), so 1000 files in total, it takes one pass of the
-original data set, not 1,000 passes. If creating 1000 training sets, which also
-means creating 1000 validation sets, so 2000 files in total, it takes two
-passes, 510 training sets and 510 validation sets on the first pass, and 490 of
-each on the second pass.
+Suppose the system file open limit is 1024 (a common value on Linux systems).
+There will already be stdin, stdout and stderr, leaving 1021 open files
+available.  If creating 500 training sets, which also means creating 500
+validation sets (one for each training set), so 1000 files in total, it takes
+one pass of the original data set, not 1,000 passes. If creating 1000 training
+sets, which also means creating 1000 validation sets, so 2000 files in total,
+it takes two passes, 510 training sets and 510 validation sets on the first
+pass, and 490 of each on the second pass.
 
 This script produces the following files.
 

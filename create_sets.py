@@ -264,7 +264,9 @@ class ValidationSet(SelectionSet):
     # sampling when creating a validation set.
     available_ordinals = None
 
-    def __init__(self, file_ordinal, original_column_count, args, column_set):
+    # pylint: disable=too-many-arguments
+    def __init__(self, file_ordinal, original_column_count, args, row_count,
+                 column_set, prefix='validation-set-'):
 
         if ValidationSet.available_ordinals is None:
             msg = 'ValidationSet: available_ordinals has not been defined'
@@ -285,7 +287,7 @@ class ValidationSet(SelectionSet):
 
         self.row_ordinals = self.get_random_ordinals(
                                      ValidationSet.available_ordinals,
-                                     args.validation_row_count)
+                                     row_count)
 
         # Determine the columns to use for this validation set. If a column set
         # was provided, use it. Otherwise use a random set of columns.
@@ -301,9 +303,9 @@ class ValidationSet(SelectionSet):
                                           original_column_count, exclude_cols)
             self.define_output_columns(args)
 
-        self.file_name = f'validation-set-{self.file_ordinal}.csv'
+        self.file_name = f'{prefix}{self.file_ordinal}.csv'
 
-        f = f'validation-set-{self.file_ordinal}-row-ordinals'
+        f = f'{prefix}{self.file_ordinal}-row-ordinals'
         self.row_ordinal_file_name = f
 
         try:
@@ -312,7 +314,7 @@ class ValidationSet(SelectionSet):
             self.cleanup()
             raise e
 
-        f = f'validation-set-{self.file_ordinal}-column-ordinals'
+        f = f'{prefix}{self.file_ordinal}-column-ordinals'
         self.column_ordinal_file_name = f
         if self.column_ordinals is not None:
             try:
@@ -407,6 +409,7 @@ class TrainingSet(SelectionSet):
 
         self.validation_set = ValidationSet(self.file_ordinal,
                                             original_column_count, args,
+                                            args.validation_row_count,
                                             column_set)
 
         # The training set uses the same columns as the validation set.
@@ -501,42 +504,37 @@ def define_and_get_args(args=None):
                         dest='original_data_file_info', help=msg, type=str,
                         default=None, required=True)
 
-
-    # Start exclusive group.
-    # Creating training/validation sets and creating generic sets are mutually
-    # exclusive, but it is required to specify one.
-    group = parser.add_mutually_exclusive_group(required=True)
-
-    msg = 'The number of generic sets to create'
-    group.add_argument('--gsc', '--generic-set-count',
-                        dest='generic_set_count', help=msg, type=int)
-
-    msg = 'The number of training sets to create'
-    group.add_argument('--tsc', '--training-set-count',
-                        dest='training_set_count', help=msg, type=int)
-    # End exclusive group.
+    msg = 'The number of sets to create, training or generic'
+    parser.add_argument('--sc', '--set-count', dest='set_count', help=msg,
+                        type=int, required=True)
 
     msg = 'The number of rows to extract for each generic set.'
     parser.add_argument('--grc', '--generic-row-count',
                         dest='generic_row_count', help=msg,
-                        type=int)
+                        type=int, required=False)
 
     msg = 'The percentage of original file records to use'
     msg += ' for sampling training sets. The remaining record to use for'
     msg += ' sampling validation sets.'
     parser.add_argument('--tp', '--training-percent', dest='training_percent',
-                        help=msg, type=float)
+                        help=msg, type=float, required=False)
 
     msg = 'The number of rows to extract for each training set.'
     parser.add_argument('--trc', '--training-row-count',
-                        dest='training_row_count', help=msg, type=int)
+                        dest='training_row_count', help=msg, type=int,
+                        required=False)
 
     msg = 'The number of rows to extract for each validation set.'
     parser.add_argument('--vrc', '--validation-row-count',
-                        dest='validation_row_count', help=msg, type=int)
+                        dest='validation_row_count', help=msg, type=int,
+                        required=False)
 
+    msg = 'The file name of a file with a resticted set of column ordinals'
+    msg += ' to use'
+    parser.add_argument('--cs', '--column-set', dest='column_set_file_name',
+                        help=msg, type=str, required=False)
 
-    # This required whether creating training/validation sets or creating
+    # This is required whether creating training/validation sets or creating
     # generic sets.
     msg = 'The number of columns to extract for each validation'
     msg += ' and training set or for each generic set.'
@@ -551,15 +549,9 @@ def define_and_get_args(args=None):
     parser.add_argument('--oc', '--outcome-column', dest='outcome_column',
                         help=msg, type=int, required=True)
 
-    msg = 'The file name of a file with a resticted set of column ordinals'
-    msg += ' to use'
-    parser.add_argument('--cs', '--column-set', dest='column_set_file_name',
-                        help=msg, type=str, default=None, required=False)
-
     msg = 'The delimiter of the original file'
-    parser.add_argument('--del', '--delimiter',
-                        dest='delimiter', help=msg, type=str, default=',',
-                        required=False)
+    parser.add_argument('--del', '--delimiter', dest='delimiter', help=msg,
+                        type=str, default=',', required=False)
 
     args = parser.parse_args()
     return args
@@ -700,6 +692,13 @@ def check_training_args(args, args_ok):
         print(msg)
         args_ok = False
 
+    if args.column_set_file_name is not None and \
+       not os.path.isfile(args.column_set_file_name):
+        msg = '\nColumn set file "{0}" does not exist.\n'
+        msg = msg.format(args.column_set_file_name)
+        print(msg)
+        args_ok = False
+
     args_ok = check_unallowed_arg('training/validation', args.generic_row_count,
                                   'generic_row_count', args_ok)
 
@@ -715,7 +714,13 @@ def check_args(args):
 
     args_ok = check_file_args(args, args_ok)
 
-    if args.generic_set_count is not None:
+    if args.set_count < 1:
+        msg = 'The set count, {0}, is less than 1.'
+        msg = msg.format(args.set_count)
+        print(msg)
+        args_ok = False
+
+    if args.generic_row_count is not None:
         args_ok = check_generic_args(args, args_ok)
     else:
         args_ok = check_training_args(args, args_ok)
@@ -745,13 +750,6 @@ def check_args(args):
         print(msg)
         args_ok = False
 
-    if args.column_set_file_name is not None and \
-       not os.path.isfile(args.column_set_file_name):
-        msg = '\nColumn set file "{0}" does not exist.\n'
-        msg = msg.format(args.column_set_file_name)
-        print(msg)
-        args_ok = False
-
     if not args_ok:
         sys.exit(1)
 
@@ -777,7 +775,9 @@ def print_args(args):
     msg = 'args.original_data_file_info: {0}'
     print(msg.format(args.original_data_file_info))
 
-    if args.generic_set_count is not None:
+    print(f'args.set_count: {args.set_count}')
+
+    if args.set_count is not None:
         # Print the generic set specific arguments.
         print(f'args.generic_row_count: {args.generic_row_count}')
     else:
@@ -788,12 +788,11 @@ def print_args(args):
         msg = 'args.validation_row_count: {0}'
         print(msg.format(args.validation_row_count))
 
-        print(f'args.training_set_count: {args.training_set_count}')
         print(f'args.column_set_file_name: {args.column_set_file_name}')
 
+    print(f'args.column_count: {args.column_count}')
     print(f'args.case_column: {args.case_column}')
     print(f'args.outcome_column: {args.outcome_column}')
-    print(f'args.column_count: {args.column_count}')
     print(f'args.delimiter: {args.delimiter}')
 
     print('')
@@ -939,19 +938,31 @@ def define_available_ordinals(original_line_count, args):
     TrainingSet.available_ordinals = data_ordinals[0:training_ordinal_count]
     ValidationSet.available_ordinals = data_ordinals[training_ordinal_count:]
 
-def create_selection_sets(original_column_count, starting_set_number,
-                          args, column_set):
+def create_training_sets(original_line_count, original_column_count,
+                         starting_set_number, args, column_set):
 
     """
-    Create the validation set and training set objects.
+    Create the training set and validation set objects.
+
+    The TrainingSet constructor creates the Validation set for that
+    training set.
     """
 
-    print('Creating SelectionSet objects...', end='')
+    print('Creating SelectionSet objects for training and validation sets...', end='')
+
+
+    # Define Partition the original file into two disjoint sets of row ordinals,
+    # one for training sets and one for validation sets.
+
+    # Define two disjoint sets of row ordinals one for training sets and one
+    # for validation sets.
+    define_available_ordinals(original_line_count, args)
+
     selection_sets = []
 
     # Create the training sets.
-    ending_set_number = min(starting_set_number - 1 + args.training_set_count,
-                            args.training_set_count)
+    ending_set_number = min(starting_set_number - 1 + args.set_count,
+                            args.set_count)
 
     for i in range(starting_set_number, ending_set_number + 1):
         try:
@@ -968,24 +979,109 @@ def create_selection_sets(original_column_count, starting_set_number,
 
                 msg = 'A file open exception occured creating TrainingSet'
                 msg +=' {0} of {1}:\n{2}'
-                msg = msg.format(i, args.training_set_count, e)
+                msg = msg.format(i, args.set_count, e)
                 print(msg)
                 sys.exit(1)
             else:
                 msg = 'An OSError exception occured creating TrainingSet {0} of {1}:\n{2}'
-                msg = msg.format(i, args.training_set_count, e)
+                msg = msg.format(i, args.set_count, e)
                 print(msg)
                 sys.exit(1)
         # pylint: disable=broad-exception-caught
         except Exception as e:
             msg = 'An exception occured creating TrainingSet {0} of {1}:\n{2}'
-            msg = msg.format(i, args.training_set_count, e)
+            msg = msg.format(i, args.set_count, e)
             print(msg)
             sys.exit(1)
 
         selection_sets.append(tr_set)
 
     print('...Done')
+    return selection_sets, ending_set_number
+
+def create_generic_sets(original_line_count, original_column_count,
+                        starting_set_number, args, column_set):
+
+    """
+    Create the generic set objects.
+
+    We use the ValidationSet for this since they have the necessary
+    functionality, so new set class is needed. TrainingSet won't work
+    because creating a TrainingSet also creates a ValidationSet, and we
+    only need on SelectionSet for each generic set/
+    """
+
+    print('Creating SelectionSet objects for generic sets...', end='')
+
+
+    # Define the full range of row ordinals of the original file as the ones to
+    # use by the ValidatonSet class. 2 to skip the header line.
+    ValidationSet.available_ordinals = list(range(2, original_line_count+1))
+
+    selection_sets = []
+
+    # Create the training sets.
+    ending_set_number = min(starting_set_number - 1 + args.set_count, args.set_count)
+
+    for i in range(starting_set_number, ending_set_number + 1):
+        try:
+            val_set = ValidationSet(i, original_column_count, args,
+                                    args.generic_row_count, column_set,
+                                    'set-')
+        except OSError as e:
+            if e.errno == 24:
+                # A file open error occurred.
+                if len(selection_sets) > 1:
+                    # Probably attempted to open too many files.
+                    # On this pass of the original file process the training
+                    # sets successfully opened.
+                    ending_set_number = i - 1
+                    break
+
+                msg = 'A file open exception occured creating ValidationSet'
+                msg +=' {0} of {1}:\n{2}'
+                msg = msg.format(i, args.set_count, e)
+                print(msg)
+                sys.exit(1)
+            else:
+                msg = 'An OSError exception occured creating ValidationSet {0} of {1}:\n{2}'
+                msg = msg.format(i, args.set_count, e)
+                print(msg)
+                sys.exit(1)
+        # pylint: disable=broad-exception-caught
+        except Exception as e:
+            msg = 'An exception occured creating ValidationSet {0} of {1}:\n{2}'
+            msg = msg.format(i, args.set_count, e)
+            print(msg)
+            sys.exit(1)
+
+        selection_sets.append(val_set)
+
+    print('...Done')
+    return selection_sets, ending_set_number
+
+def create_selection_sets(original_line_count, original_column_count,
+                          starting_set_number, args, column_set):
+
+    """
+    Create the SelectionSet objects needed for sampling.
+    """
+
+    if args.training_percent is not None:
+        # Doing training and validation sets.
+        selection_sets, ending_set_number = create_training_sets(
+                                                original_line_count,
+                                                original_column_count,
+                                                starting_set_number, args,
+                                                column_set)
+    else:
+        # Doing generic sets.
+        selection_sets, ending_set_number = create_generic_sets(
+                                                original_line_count,
+                                                original_column_count,
+                                                starting_set_number, args,
+                                                column_set)
+
     return selection_sets, ending_set_number
 
 def process_original_file(input_file, selection_sets, delimiter):
@@ -1112,8 +1208,7 @@ def program_start():
     """
 
     args = define_and_check_args()
-    print_args(args)
-    #sys.exit(0)
+    #print_args(args)
 
     # Load the original file info.
     with open(args.original_data_file_info, 'rb') as odi_file:
@@ -1126,14 +1221,12 @@ def program_start():
     if args.column_set_file_name is not None:
         column_set = get_column_set(original_column_count, args)
 
-    define_available_ordinals(original_line_count, args)
-
     # Process the original file using as many passes as necessary,
     # given the system limit on the macimum number of open files.
     starting_set_number = 1
     ending_set_number = 0
     file_pass_count = 0
-    while ending_set_number < args.training_set_count:
+    while ending_set_number < args.set_count:
 
         file_pass_count += 1
         print(f'\nPerforming pass {file_pass_count} of {args.original_file_name}')
@@ -1141,10 +1234,12 @@ def program_start():
         # Create as many SelectionSet objects as allowed by the
         # system limit on number of open files.
         (selection_sets, ending_set_number) = create_selection_sets(
+                                                  original_line_count,
                                                   original_column_count,
                                                   starting_set_number, args,
                                                   column_set)
 
+        print(f'len(selection_sets) {len(selection_sets)}')
         msg = 'Creating SelectionSet files {} to {} ...'
         print(msg.format(starting_set_number, ending_set_number), end='')
         if args.original_file_name.endswith('.zip'):
