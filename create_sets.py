@@ -148,16 +148,27 @@ class SelectionSet:
 
         """
         For writing the selected columns in the same order as they are in the
-        original file. Also, to include the case number and output columns in
-        the output, as the first and second columns.
+        original file. Also, to optionally include the case number and
+        output columns in the output, as the first and second columns.
+
+        When creating training sets, both the training set and its associated
+        validation set will shave the case number and output as the first two
+        columns of the set file. These are optional for generic sets.
         """
 
         column_ordinals_sorted = list(self.column_ordinals)
         column_ordinals_sorted.sort()
 
         self.output_columns = []
+
+        # This is included even if it is None. In that case it is to indicate
+        # writing the row ordinal instead. This is for generic sets, for which
+        # the case number is optional.
         self.output_columns.append(args.case_column)
-        self.output_columns.append(args.outcome_column)
+
+        if args.outcome_column is not None:
+            self.output_columns.append(args.outcome_column)
+
         self.output_columns += column_ordinals_sorted
 
     def get_random_ordinals(self, ordinals, count):
@@ -224,25 +235,25 @@ class SelectionSet:
 
         output_columns is sorted in ascending order by column ordinal, so the
         columns will be written in the same order they are in the original
-        file. It also includes the case number column and output column, in
-        addition to the selected data columns.
+        file, except for the case number column and output column, which if
+        present are always the first two columns.
         """
 
         if ordinal in self.row_ordinals:
             # This line is for this selection set.
 
-            # Get the fields for this selection set.
-            if self.output_columns is None:
-                # Get all the fields.
-                fields_to_write = fields
-            else:
-                fields_to_write = []
-                for o in self.output_columns:
+            fields_to_write = []
+            for i, o in enumerate(self.output_columns):
 
+                if i == 0 and self.output_columns[i] is None:
+                    # This is for a generic set that is not including the case
+                    # column. Write the row ordinal instead.
+                    fields_to_write.append(str(ordinal))
+                else:
+                    # Write a data column.
                     # Because we count column ordinals from 1, but list indices
                     # start at 0.
                     o1 = o - 1
-
                     fields_to_write.append(fields[o1])
 
             # Write the fields to the training set file.
@@ -544,11 +555,11 @@ def define_and_get_args(args=None):
 
     msg = 'The case number column ordinal'
     parser.add_argument('--cn', '--case-column', dest='case_column',
-                        help=msg, type=int, required=True)
+                        help=msg, type=int, required=False)
 
     msg = 'The outcome column ordinal'
     parser.add_argument('--oc', '--outcome-column', dest='outcome_column',
-                        help=msg, type=int, required=True)
+                        help=msg, type=int, required=False)
 
     msg = 'The delimiter of the original file'
     parser.add_argument('--del', '--delimiter', dest='delimiter', help=msg,
@@ -700,6 +711,18 @@ def check_training_args(args, args_ok):
         print(msg)
         args_ok = False
 
+    # The case column and output column are requried for training and
+    # validation sets but are optional for generic sets. So their values
+    # are checked later.
+    args_ok = check_required_arg('training/validation', args.case_column,
+                                 'case_column', args_ok)
+
+    args_ok = check_required_arg('training/validation', args.outcome_column,
+                                 'outcome_column', args_ok)
+
+
+
+
     args_ok = check_unallowed_arg('training/validation', args.generic_row_count,
                                   'generic_row_count', args_ok)
 
@@ -732,19 +755,21 @@ def check_args(args):
         print(msg)
         args_ok = False
 
-    if args.case_column < 1:
+    if args.case_column is not None and args.case_column < 1:
         msg = 'The case number column ordinal, {0}, is less than 1.'
         msg = msg.format(args.case_column)
         print(msg)
         args_ok = False
 
-    if args.outcome_column < 1:
+    if args.outcome_column is not None and args.outcome_column < 1:
         msg = 'The outcome column ordinal, {0}, is less than 1.'
         msg = msg.format(args.outcome_column)
         print(msg)
         args_ok = False
 
-    if args.case_column == args.outcome_column:
+    if (args.case_column is not None and args.outcome_column is not None and
+        args.case_column == args.outcome_column):
+
         msg = 'The case number column ordinal and outcome column are the'
         msg += ' same, {0}'
         msg = msg.format(args.case_column)
@@ -807,14 +832,18 @@ def check_args_additional(original_column_count, args):
 
     args_ok = True
 
-    if args.case_column > original_column_count:
+    if (args.case_column is not None and
+       args.case_column > original_column_count):
+
         msg = 'The case number column ordinal, {0}, is greater than the number'
         msg += ' of columns in the original file, {1}.'
         msg = msg.format(args.case_column, original_column_count)
         print(msg)
         args_ok = False
 
-    if args.outcome_column > original_column_count:
+    if (args.outcome_column is not None and
+        args.outcome_column > original_column_count):
+
         msg = 'The output column ordinal, {0}, is greater than the number'
         msg += ' of columns in the original file, {1}.'
         msg = msg.format(args.outcome_column, original_column_count)

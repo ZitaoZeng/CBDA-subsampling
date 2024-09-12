@@ -34,8 +34,12 @@ the validation sets.
 
 A set of generic samples can also be created instead of pairs of training and
 validation sets.  This creates the specified number of files sampled from the
-original data file. See the Examples section below for an example of how to do
-this.
+original data file. In this case the case number column and output column are
+optional. If the case number is not specified the row ordinal is written, as
+the first column in the set file. If the output column is not specified is is
+not written to the set file.
+
+See the Examples section below for an example of how to create generic sets.
 
 There are 4 scripts in this part of the CBDA project, 3 Python3 scripts and 1
 bash script. For the Python scripts use the "-h" command line option to see the
@@ -98,11 +102,19 @@ remainder of the original data file lines used for validation sets).
 
 It excludes the case number and outcome column from the randomly selected
 attribute column ordinals to include for a training or validation set, but it
-does write those columns to each training set and each validation set or to
-each generic set, in addition to the randomly selected attribute columns.
+does write those columns to each training set and each validation set, as the
+first two columns, followed by the randomly selected attribute columns in the
+order they appeared in the original file.
 
-It makes as few passes as possible of the original data set to create all the
-resulting sets. The number of passes of the original data set is
+The case number column and output column are optional when creating generic
+sets. If the case number is not specified the row ordinal is written as the
+first column in each generic set. If the output column is not specified, it is
+not included and nothing is written in its place. The randomly selected
+attribute columns are then written in the order they appeared in the original
+file.
+
+create_sets.py makes as few passes as possible of the original data set to
+create all the resulting sets. The number of passes of the original data set is
 determined by the system limit on the maximum number of open files.
 
 Suppose the system file open limit is 1024 (a common value on Linux systems).
