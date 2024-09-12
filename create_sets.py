@@ -546,8 +546,10 @@ def define_and_get_args(args=None):
     parser.add_argument('--cs', '--column-set', dest='column_set_file_name',
                         help=msg, type=str, required=False)
 
-    # This is required whether creating training/validation sets or creating
-    # generic sets.
+    msg = 'The starting number of columns to use from the column set file.'
+    parser.add_argument('--css', '--column-set-start', dest='column_set_start',
+                        help=msg, type=int, required=False)
+
     msg = 'The number of columns to extract for each validation'
     msg += ' and training set or for each generic set.'
     parser.add_argument('--cc', '--column-count', dest='column_count',
@@ -583,7 +585,7 @@ def check_file_args(args, args_ok):
         args_ok = False
 
     if not os.path.isfile(args.original_data_file_info):
-        msg = '\nValidation ordinal file "{0}" does not exist.\n'
+        msg = '\nThe orginal data file infoi file "{0}" does not exist.\n'
         msg = msg.format(args.original_data_file_info)
         print(msg)
         args_ok = False
@@ -652,7 +654,7 @@ def check_generic_args(args, args_ok):
 
     if args.generic_row_count is not None and  args.generic_row_count < 1:
         msg = 'The generic row count, {0}, is less than 1.'
-        msg = msg.format(args.training_row_count)
+        msg = msg.format(args.generic_row_count)
         print(msg)
         args_ok = False
 
@@ -667,6 +669,9 @@ def check_generic_args(args, args_ok):
 
     args_ok = check_unallowed_arg('generic', args.column_set_file_name,
                                   'column_set_file_name', args_ok)
+
+    args_ok = check_unallowed_arg('generic', args.column_set_start,
+                                  'column_set_start', args_ok)
 
     return args_ok
 
@@ -720,8 +725,38 @@ def check_training_args(args, args_ok):
     args_ok = check_required_arg('training/validation', args.outcome_column,
                                  'outcome_column', args_ok)
 
+    # The column set file and column set start are optional for training and
+    # validation sets. If one of those is specified the other must also be
+    # specified.
+    if args.column_set_file_name is not None:
 
+        if args.column_set_start is None:
+            msg = 'A column set file was specified, {},'
+            msg += ' but no column set start was specified'
+            msg = msg.format(args.column_set_file_name)
+            print(msg)
+            args_ok = False
 
+        if not os.path.isfile(args.column_set_file_name):
+            msg = '\nColumn set file "{0}" does not exist.\n'
+            msg = msg.format(args.column_set_file_name)
+            print(msg)
+            args_ok = False
+
+    if args.column_set_start is not None:
+
+        if args.column_set_file_name is None:
+            msg = 'A column set start was specified, {},'
+            msg += ' but no column set file was specified'
+            msg = msg.format(args.column_set_start)
+            print(msg)
+            args_ok = False
+
+        if args.column_set_start < 1:
+            msg = 'The column set start, {}, is less than 1.'
+            msg = msg.format(args.column_set_start)
+            print(msg)
+            args_ok = False
 
     args_ok = check_unallowed_arg('training/validation', args.generic_row_count,
                                   'generic_row_count', args_ok)
@@ -815,6 +850,7 @@ def print_args(args):
         print(msg.format(args.validation_row_count))
 
         print(f'args.column_set_file_name: {args.column_set_file_name}')
+        print(f'args.column_set_start: {args.column_set_start}')
 
     print(f'args.column_count: {args.column_count}')
     print(f'args.case_column: {args.case_column}')
@@ -853,6 +889,7 @@ def check_args_additional(original_column_count, args):
     if not args_ok:
         sys.exit(1)
 
+# pylint:disable=too-many-statements
 def get_column_set(original_column_count, args):
 
     """
@@ -868,11 +905,10 @@ def get_column_set(original_column_count, args):
         However, this is not checked by this script.
 
     Only the requested number of columns to use (args.column_count) are read.
-
-    At this time only the column ordinal field is read.
     """
 
-    column_set = set()
+    column_set = []
+    previous_priority = float('inf')
     with open(args.column_set_file_name, 'r', encoding='utf_8') as input_file:
         ordinal_base = 1
         for (ordinal, line) in enumerate(input_file, ordinal_base):
@@ -884,12 +920,27 @@ def get_column_set(original_column_count, args):
             # read.
             fields = line.rstrip('\n').split(',')
 
+            if len(fields) > 2:
+                msg = 'Line {} of column set file {} has {} fields.'
+                msg += ' Only 2 are expected.'
+                msg = msg.format(ordinal, args.column_set_file_name, len(fields))
+                print(msg)
+                sys.exit(1)
+
             try:
                 column = int(fields[0])
             except ValueError:
                 msg = 'Column "{0}" from line {1} of file {2} is not an'
                 msg += ' integer.'
                 msg = msg.format(fields[0], ordinal, args.column_set_file_name)
+                print(msg)
+                sys.exit(1)
+
+            try:
+                priority = float(fields[1])
+            except ValueError:
+                msg = 'Priority "{0}" from line {1} of file {2} is not a float.'
+                msg = msg.format(fields[1], ordinal, args.column_set_file_name)
                 print(msg)
                 sys.exit(1)
 
@@ -917,6 +968,14 @@ def get_column_set(original_column_count, args):
                 print(msg)
                 sys.exit(1)
 
+            if priority > previous_priority:
+                msg = 'Priority {} from line {} of column set file {}'
+                msg += ' is > the priority of {} from the previous line.'
+                msg = msg.format(priority, ordinal, args.column_set_file_name,
+                                 previous_priority)
+                print(msg)
+                sys.exit(1)
+
             if column in column_set:
                 msg = 'Column "{0}" from line {1}'
                 msg += ' already appeared in file {2}.'
@@ -924,7 +983,8 @@ def get_column_set(original_column_count, args):
                 print(msg)
                 sys.exit(1)
 
-            column_set.add(column)
+            column_set.append(column)
+            previous_priority = priority
 
     return column_set
 
@@ -996,7 +1056,14 @@ def create_training_sets(original_line_count, original_column_count,
 
     for i in range(starting_set_number, ending_set_number + 1):
         try:
-            tr_set = TrainingSet(i, original_column_count, args, column_set)
+
+            column_set_to_use = column_set
+            if args.column_set_start is not None:
+                # Using a column set file.
+                cols = args.column_set_start + (i - 1)
+                column_set_to_use = column_set[0:cols]
+
+            tr_set = TrainingSet(i, original_column_count, args, column_set_to_use)
         except OSError as e:
             if e.errno == 24:
                 # A file open error occurred.
@@ -1043,6 +1110,12 @@ def create_generic_sets(original_line_count, original_column_count,
 
     print('Creating SelectionSet objects for generic sets...', end='')
 
+    if column_set is not None:
+        # Generic sets can't use a column set, so one should not have been
+        # specified.
+        msg = 'Creating generic sets but a column set was specified.'
+        print(msg)
+        sys.exit(1)
 
     # Define the full range of row ordinals of the original file as the ones to
     # use by the ValidatonSet class. 2 to skip the header line.
@@ -1270,6 +1343,25 @@ def program_start():
     column_set = None
     if args.column_set_file_name is not None:
         column_set = get_column_set(original_column_count, args)
+
+        column_set_count = len(column_set)
+        if column_set_count < args.column_count:
+            msg += 'The number of columns, {}, from the column set file'
+            msg += ' {} is less than the specified column count of {}.'
+            msg = msg.format(column_set_count, args.column_set_file_name,
+                             args.column_count)
+            print(msg)
+            sys.exit(1)
+
+        set_count_limit = len(column_set) - args.column_set_start + 1
+        if args.set_count > set_count_limit:
+            msg = 'The set count of {} is greater than the number of sets'
+            msg += ' supportable, {}, by the column set start of {} and the'
+            msg += ' column count of {}.'
+            msg = msg.format(args.set_count, set_count_limit,
+                             args.column_set_start, args.column_count)
+            print(msg)
+            sys.exit(1)
 
     # Process the original file using as many passes as necessary,
     # given the system limit on the macimum number of open files.

@@ -41,6 +41,17 @@ not written to the set file.
 
 See the Examples section below for an example of how to create generic sets.
 
+Sometimes, after an initial set of machine learning steps, a set of columns
+from the original file will be identified as important. A list of column
+ordinals is produced, along with a priority for each column. The higher the
+priority the more important the column is. This restricted set of columns can
+be used to refine the analysis, For example, comparing the accuracy of outcome
+predictions of the 3 highest priority columns to results using the 4 highest
+priority columns, the 5 highest, etc., up to some user specified limit.
+
+This is the ascending approach. See a more detailed description on how to do
+this in the section describing script create_sets.py and in the examples.
+
 There are 4 scripts in this part of the CBDA project, 3 Python3 scripts and 1
 bash script. For the Python scripts use the "-h" command line option to see the
 command line options for running the script.
@@ -125,6 +136,19 @@ one pass of the original data set, not 1,000 passes. If creating 1000 training
 sets, which also means creating 1000 validation sets, so 2000 files in total,
 it takes two passes, 510 training sets and 510 validation sets on the first
 pass, and 490 of each on the second pass.
+
+When using the ascending column approach, there is a column set file, typically
+created by the machine learning process, that has a list of column and
+priorities.  Each line of the file has two values, a column ordinal and a
+priority. The name of this file is specified using the --cs option. The --css
+option must also be specified, which indicates the number of columns from the
+start of the file to be used for the first training set. Each subsequent
+training set created will use an additional column from the file, in the order
+they are listed in the file. If the column set file has 5 columns listed and
+the --css otion is 3, the first training set will use the first 3 columns from
+this file, the 3nd training set will use the first 4 columns of this file, etc.
+
+See the examples section
 
 When creating training and validation sets, this script produces the following
 files.
@@ -307,6 +331,47 @@ set-2-row-ordinals
 set-3.csv
 set-3-column-ordinals
 set-3-row-ordinals
+
+-------------------------------
+Example 3: the ascending option
+-------------------------------
+
+Suppose there is column set file column-set.csv with the following contents:
+20,20.1
+18,18.1
+16,16.1
+14,14.1
+12,12.1
+
+We can use this to create 3 training sets (with 3 validation sets). The first
+training set will have the first 3 columns from column-set.csv, columns
+20,18,16. The 2nd training set will have columns 20,18,16, 14. The 3rd training
+set will have columns 20,18,16,14,12.
+
+$ create_sets.py -i test-data.csv --odfi test-data.csv.pickle --trc 2 --vrc 4 --cc 5 --cn 7 --oc 2 --sc 3 --tp 0.7 --cs column-set.csv --css 3
+
+This produces the following files:
+
+training-set-1.csv
+training-set-1-row-ordinals
+
+training-set-2.csv
+training-set-2-row-ordinals
+
+training-set-3.csv
+training-set-3-row-ordinals
+
+validation-set-1.csv
+validation-set-1-column-ordinals
+validation-set-1-row-ordinals
+
+validation-set-2.csv
+validation-set-2-column-ordinals
+validation-set-2-row-ordinals
+
+validation-set-3.csv
+validation-set-3-column-ordinals
+validation-set-3-row-ordinals
 
 *****************
 Programming Notes
