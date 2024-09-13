@@ -1,0 +1,72 @@
+
+This project has had a git pre-commit hook added. The files which implement
+this are in subdirectory hooks.
+
+Script hooks/pre-commit runs hooks/pre-commit-sample-modified and then runs
+hooks/pre-commit-python.
+
+hooks/pre-commit-sample-modified is a modified copy of the sample pre-commit
+hook that git put into .git/hooks. The modifications are noted in this file.
+It checks the files being committed for names that have non-ascii characters and
+for whitespace issues - trailing whitespace on a line or blank lines at the end
+of a file. It aborts the commit if there are any violations of these
+conditions.
+
+hooks/pre-commit-python runs each file being committed that is a Python script
+through the pylint program, which checks a file for conformance to the Python
+Pep8 code standard. Any violations abort the commit.
+
+To enable the pre-commit hook, after cloning the repository, run the command
+hooks/setup-hooks. This will update .git/config to use directory hooks as the
+location for hooks to run, instead of .git/hooks. This allows versioning the
+hooks along with the main code and for easily sharing them with anyone that
+clones the repository.
+
+pylint mostly follows Pep8, but not exactly. One known difference is that Pep8
+considers 79 characters to be the mxaimum line length, whereas pylint's default
+is a maximum line length of 100 characters.
+
+There are a few instances where pylint directives have been added to the code
+to disable a particular contraint for a particular section of code. These were
+deemed appropriate in those few instances. It is important not to do this as a
+matter of course for any or many pylint violations. In particular the naming
+and whitespace conventionshould always be adhered to.
+
+Pep8 is an extensive and detailed coding standard. It is well worth reviewing
+in its entirety at https://peps.python.org/pep-0008/.
+
+A few of the items there are:
+
+A line should not end in whitespace.
+
+Use spaces for indentation.
+
+Program file names, function arguments, local variables, class variables and
+class instance variables and class methd names should be snake case - words in
+a name are separated by underscore. Ex. program file name of
+really_good_program.py or variable name of file_name.
+
+Class names are in camel case - the first character is upper case and the first
+character of each subsequent word is upper case. Ex. class ThisIsMyClass.
+
+
+Additional considerations:
+
+While not strictly a Pep8 or pylint contraint, directory and file names should
+not contain spaces.  These are very difficult to use in a command line
+environment.
+
+Code and data must be kept separately.
+	Data should generally not be kept in version control, but stored in a permanent location,
+	typically on a server or in a cloud service.
+
+Production runs should not be performed in the source directory.
+	This pollutes the source directory with extraneous data.
+
+	The source directory should be added to the execution path.
+
+	A directory for a production run should be created and made the current
+	directory.
+
+	The sub-sampling, and any subsequent machine learning workflow, should take
+	place with the production directory as the current directory.

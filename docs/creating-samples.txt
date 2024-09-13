@@ -1,10 +1,4 @@
 
-This project is a set of scripts for creating validation and training sets for
-the CBDA machine learning project.
-
-See the section "Programming Notes" at the end of this document on some
-important notes about making changes to the project source files.
-
 For a quick start see the examples at the end of this file.
 
 The idea is to use machine learning to examine patient data, including patient
@@ -372,30 +366,3 @@ validation-set-2-row-ordinals
 validation-set-3.csv
 validation-set-3-column-ordinals
 validation-set-3-row-ordinals
-
-*****************
-Programming Notes
-*****************
-
-This project has had a git pre-commit hook added. The files which implement
-this are in subdirectory hooks.
-
-Script hooks/pre-commit runs hooks/pre-commit-sample-modified and then runs
-hooks/pre-commit-python.
-
-hooks/pre-commit-sample-modified is a modified copy of the sample pre-commit
-hook that git put into .git/hooks. The modifications are noted in this file.
-It checks the files being committed for names that have non-ascii characters and
-for whitespace issues - trailing whitespace on a line or blank lines at the end
-of a file. It aborts the commit if there are any violations of these
-conditions.
-
-hooks/pre-commit-python runs each file being committed that is a Python script
-through the pylint program, which checks a file for conformance to the Python
-Pep8 code standard. Any violations abort the commit.
-
-To enable the pre-commit hook, after cloning the repository, run the command
-hooks/setup-hooks. This will update .git/config to use directory hooks as the
-location for hooks to run, instead of .git/hooks. This allows versioning the
-hooks along with the main code and for easily sharing them with anyone that
-clones the repository.

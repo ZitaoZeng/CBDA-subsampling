@@ -1,0 +1,52 @@
+
+At various times the following versions existed. The ones on github may still
+be around, and the ones not in github might exist on various project computers.
+
+We will use the following Github repository going forward:
+https://github.com/simeonem/CBDA-subsampling
+
+At one point a student (Zitao) created a version of the sampling code with some
+changes and additional features.  These had several problems, including some
+bugs and a lack of documentation. Those changes and features have been
+implemented in the latest version in the current code base in
+https://github.com/simeonem/CBDA-subsampling.
+
+https://github.com/simeonem/CBDA-subsampling
+
+    It can be cloned using ssh public keys with:
+    git clone git@github.com:simeonem/CBDA-subsampling.git
+
+https://github.com/SOCR/CBDA/ in CBDA 20 R 2.0.0/Python
+    This seems to be a very old, out of date, version of the initial version,
+    without the changes made by Zitao.
+
+    The full repository was last updated 2 years ago.
+
+    CBDA 20 R 2.0.0/Python was last udpated 5 years ago.
+
+https://github.com/simeonem/CBDAtemp, in CBDA R 2.0.0/Python
+    This is the same as in https://github.com/SOCR/CBDA/ in CBDA 20 R 2.0.0/Python.
+
+    The full repository was last updated 4 years ago.
+
+    CBDA 20 R 2.0.0/Python was last udpated 5 years ago.
+
+CBDA-versions/Sample_UKBB.zip
+    This is a version with the small rice data set, kept by Simeone Marino.
+    It has the changes made by Zitao.
+
+    This version is not in Github.
+
+    It unzips to directory Sample_UKBB, the same directory name as
+    Python_Subsampling.zip unzips to, so be carefull not to unzip
+    both Sample_UKBB.zip and Python_Subsampling.zip in the same directory.
+
+CBDA-versions/Python_Subsampling.zip
+    This is the version with the big rice data set, kept by Simeone Marino.
+    It has the changes made by Zitao.
+
+    This version is not in Github.
+
+    It unzips to directory Sample_UKBB, the same directory name as
+    Sample_UKBB.zip unzips to, so be carefull not to unzip
+    both Sample_UKBB.zip and Python_Subsampling.zip in the same directory.
