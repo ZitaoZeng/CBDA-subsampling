@@ -1002,35 +1002,44 @@ def define_available_ordinals(original_line_count, args):
 
     # 2 to skip the header line.
     data_ordinals = list(range(2, original_line_count+1))
-    random.shuffle(data_ordinals)
 
-    data_ordinal_count = len(data_ordinals)
-    training_ordinal_count = int(args.training_percent * data_ordinal_count)
-    validation_ordinal_count = data_ordinal_count - training_ordinal_count
+    if args.training_percent is not None:
+        # Creating training and validation sets.
+        random.shuffle(data_ordinals)
 
-    args_ok = True
-    if args.training_row_count >= training_ordinal_count:
-        msg = 'The training row count, {}, is greater than the available'
-        msg += ' training rows {}.'
-        msg = msg.format(args.training_row_count, training_ordinal_count)
-        print(msg)
-        args_ok = False
+        data_ordinal_count = len(data_ordinals)
+        training_ordinal_count = int(args.training_percent * data_ordinal_count)
+        validation_ordinal_count = data_ordinal_count - training_ordinal_count
 
-    if args.validation_row_count >= validation_ordinal_count:
-        msg = 'The validation row count, {}, is greater than or equal to the'
-        msg += ' available validation row count of {}.'
-        msg = msg.format(args.validation_row_count, validation_ordinal_count)
-        print(msg)
-        args_ok = False
+        args_ok = True
+        if args.training_row_count >= training_ordinal_count:
+            msg = 'The training row count, {}, is greater than the available'
+            msg += ' training rows {}.'
+            msg = msg.format(args.training_row_count, training_ordinal_count)
+            print(msg)
+            args_ok = False
 
-    if not args_ok:
-        sys.exit(1)
+        if args.validation_row_count >= validation_ordinal_count:
+            msg = 'The validation row count, {}, is greater than or equal to the'
+            msg += ' available validation row count of {}.'
+            msg = msg.format(args.validation_row_count, validation_ordinal_count)
+            print(msg)
+            args_ok = False
 
-    TrainingSet.available_ordinals = data_ordinals[0:training_ordinal_count]
-    ValidationSet.available_ordinals = data_ordinals[training_ordinal_count:]
+        if not args_ok:
+            sys.exit(1)
 
-def create_training_sets(original_line_count, original_column_count,
-                         starting_set_number, args, column_set):
+        TrainingSet.available_ordinals = data_ordinals[0:training_ordinal_count]
+        ValidationSet.available_ordinals = data_ordinals[training_ordinal_count:]
+
+    else:
+        # Creating generic sets.
+        # Define the full range of row ordinals of the original file as the ones to
+        # use by the ValidatonSet class. 2 to skip the header line.
+        ValidationSet.available_ordinals = list(data_ordinals)
+
+def create_training_sets(original_column_count, starting_set_number, args,
+                         column_set):
 
     """
     Create the training set and validation set objects.
@@ -1040,14 +1049,6 @@ def create_training_sets(original_line_count, original_column_count,
     """
 
     print('Creating SelectionSet objects for training and validation sets...', end='')
-
-
-    # Define Partition the original file into two disjoint sets of row ordinals,
-    # one for training sets and one for validation sets.
-
-    # Define two disjoint sets of row ordinals one for training sets and one
-    # for validation sets.
-    define_available_ordinals(original_line_count, args)
 
     selection_sets = []
 
@@ -1097,8 +1098,8 @@ def create_training_sets(original_line_count, original_column_count,
     print('...Done')
     return selection_sets, ending_set_number
 
-def create_generic_sets(original_line_count, original_column_count,
-                        starting_set_number, args, column_set):
+def create_generic_sets(original_column_count, starting_set_number, args,
+                        column_set):
 
     """
     Create the generic set objects.
@@ -1106,7 +1107,7 @@ def create_generic_sets(original_line_count, original_column_count,
     We use the ValidationSet for this since they have the necessary
     functionality, so new set class is needed. TrainingSet won't work
     because creating a TrainingSet also creates a ValidationSet, and we
-    only need on SelectionSet for each generic set/
+    only need one SelectionSet for each generic set.
     """
 
     print('Creating SelectionSet objects for generic sets...', end='')
@@ -1117,10 +1118,6 @@ def create_generic_sets(original_line_count, original_column_count,
         msg = 'Creating generic sets but a column set was specified.'
         print(msg)
         sys.exit(1)
-
-    # Define the full range of row ordinals of the original file as the ones to
-    # use by the ValidatonSet class. 2 to skip the header line.
-    ValidationSet.available_ordinals = list(range(2, original_line_count+1))
 
     selection_sets = []
 
@@ -1164,8 +1161,8 @@ def create_generic_sets(original_line_count, original_column_count,
     print('...Done')
     return selection_sets, ending_set_number
 
-def create_selection_sets(original_line_count, original_column_count,
-                          starting_set_number, args, column_set):
+def create_selection_sets(original_column_count, starting_set_number, args,
+                          column_set):
 
     """
     Create the SelectionSet objects needed for sampling.
@@ -1174,14 +1171,12 @@ def create_selection_sets(original_line_count, original_column_count,
     if args.training_percent is not None:
         # Doing training and validation sets.
         selection_sets, ending_set_number = create_training_sets(
-                                                original_line_count,
                                                 original_column_count,
                                                 starting_set_number, args,
                                                 column_set)
     else:
         # Doing generic sets.
         selection_sets, ending_set_number = create_generic_sets(
-                                                original_line_count,
                                                 original_column_count,
                                                 starting_set_number, args,
                                                 column_set)
@@ -1367,6 +1362,10 @@ def program_start():
             print(msg)
             sys.exit(1)
 
+    # Define a partition the original file into two disjoint sets of row
+    # ordinals, one for training sets and one for validation sets.
+    define_available_ordinals(original_line_count, args)
+
     # Process the original file using as many passes as necessary,
     # given the system limit on the macimum number of open files.
     starting_set_number = 1
@@ -1391,7 +1390,6 @@ def program_start():
             # Create as many SelectionSet objects as allowed by the
             # system limit on number of open files.
             (selection_sets, ending_set_number) = create_selection_sets(
-                                                      original_line_count,
                                                       original_column_count,
                                                       starting_set_number, args,
                                                       column_set)
