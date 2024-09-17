@@ -109,6 +109,7 @@ import pickle
 import random
 from contextlib import contextmanager
 import zipfile
+import time
 
 class SelectionSet:
 
@@ -1016,8 +1017,8 @@ def define_available_ordinals(original_line_count, args):
         args_ok = False
 
     if args.validation_row_count >= validation_ordinal_count:
-        msg = 'The validation row count, {}, is greater than the available'
-        msg += ' validation rows {}.'
+        msg = 'The validation row count, {}, is greater than or equal to the'
+        msg += ' available validation row count of {}.'
         msg = msg.format(args.validation_row_count, validation_ordinal_count)
         print(msg)
         args_ok = False
@@ -1319,6 +1320,7 @@ def close_selection_sets(selection_sets):
     for selset in selection_sets:
         selset.close()
 
+# pylint: disable=too-many-locals
 def program_start():
     """
     The main function for the program.
@@ -1329,6 +1331,8 @@ def program_start():
     (pyling considers a constant any variable defined at module level that is
      not bound to a class object).
     """
+
+    total_tic = time.perf_counter()
 
     args = define_and_check_args()
     #print_args(args)
@@ -1370,6 +1374,7 @@ def program_start():
     file_pass_count = 0
     while ending_set_number < args.set_count:
 
+        tic = time.perf_counter()
         file_pass_count += 1
         print(f'\nPerforming pass {file_pass_count} of {args.original_file_name}')
 
@@ -1398,7 +1403,22 @@ def program_start():
         close_selection_sets(selection_sets)
         print('...Done')
 
+        # For generic sets this is the total number of sets in the pass.
+        # For training/validation sets it is the number of training sets,
+        # not the number of training sets + number of validation sets.
+        pass_set_count = ending_set_number - starting_set_number + 1
+
+        toc = time.perf_counter()
+        pass_time = toc - tic
+        set_time = pass_time / pass_set_count
+        msg = f'Pass {file_pass_count} took {pass_time:.0f} seconds,'
+        msg += f' {set_time:.0f} seconds per set for {pass_set_count} sets.'
+        print(msg)
+
         starting_set_number = ending_set_number + 1
+
+    total_toc = time.perf_counter()
+    print(f'\n{file_pass_count} passes completed in {total_toc - total_tic:.0f} seconds')
 
 if __name__ == '__main__':
     program_start()
