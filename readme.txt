@@ -5,7 +5,7 @@ a csv data file for use in a machine learning process.
 This was originally created for the CBDA machine learning project, but may be
 useful for other machine learning projects.
 
-The documentation files are:
+The documentation files, in the doc directory, are:
 
 creating-samples.txt
 	How to use the programs for creating files of random samples from a csv
