@@ -175,7 +175,6 @@ class SelectionSet:
     def get_random_ordinals(self, ordinals, count):
 
         """
-        Generate the set of data line ordinals.
         Get a set of count random elements from ordinals.
 
         ordinals are a list of data line ordinals from the original file.
@@ -183,7 +182,7 @@ class SelectionSet:
         count should be an integer.
         """
 
-        ordinal_sample = random.sample(ordinals, count)
+        ordinal_sample = set(random.sample(ordinals, count))
         return ordinal_sample
 
     def get_random_ordinals_exclude(self, count, start, end, exclude):
