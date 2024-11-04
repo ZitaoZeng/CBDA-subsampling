@@ -227,7 +227,7 @@ class SelectionSet:
             for o in sorted_ordinals:
                 ordinal_file.write(str(o) + '\n')
 
-    def check_line(self, ordinal, fields):
+    def check_line(self, ordinal, fields, delimiter=','):
 
         """
         Check a line from the original file, to see if fields from it should be
@@ -257,7 +257,7 @@ class SelectionSet:
                     fields_to_write.append(fields[o1])
 
             # Write the fields to the training set file.
-            field_str = ','.join(fields_to_write) + '\n'
+            field_str = delimiter.join(fields_to_write) + '\n'
             self.set_file.write(field_str)
 
 # pylint: disable=too-many-instance-attributes
@@ -474,7 +474,7 @@ class TrainingSet(SelectionSet):
 
         self.validation_set.cleanup()
 
-    def check_line(self, ordinal, fields):
+    def check_line(self, ordinal, fields, delimiter=','):
 
         """
         If doing a validation set for each training set, then check this
@@ -484,9 +484,9 @@ class TrainingSet(SelectionSet):
         """
 
         if self.validation_set is not None:
-            self.validation_set.check_line(ordinal, fields)
+            self.validation_set.check_line(ordinal, fields, delimiter)
 
-        super().check_line(ordinal, fields)
+        super().check_line(ordinal, fields, delimiter)
 
     def close(self):
         """
@@ -1232,7 +1232,7 @@ def process_original_file(input_file, selection_sets, delimiter):
             #sys.exit(0)
 
         for sel_set in selection_sets:
-            sel_set.check_line(ordinal, line_fields)
+            sel_set.check_line(ordinal, line_fields, delimiter)
 
 @contextmanager
 def get_original_file_object(original_file_name):
