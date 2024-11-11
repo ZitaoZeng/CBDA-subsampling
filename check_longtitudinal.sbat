@@ -1,0 +1,52 @@
+#!/bin/bash
+#SBATCH --job-name=zitao             ## Name of the job for the scheduler
+#SBATCH --account=si650f24_class
+#SBATCH --partition=largemem
+#SBATCH --gpus=0                      ## number of GPU you are requesting
+#SBATCH --nodes=1                      ## number of nodes you are requesting
+#SBATCH --ntasks=1                     ## how many resource spaces do you need
+#SBATCH --cpus-per-task=1              ## how many cores do you want to reserve
+#SBATCH --time=4:00:00                 ## Maximum length of time you are reserving the resources for (if job ends sooner, bill is based on time used)
+#SBATCH --mem=120g                      ## Memory requested per core 122Gb GPU / arc.umich.edu
+#SBATCH --mail-user=zitaozen@umich.edu  ## send email notifications to umich email listed
+#SBATCH --mail-type=END                ## when to send email (standard values are: NONE, BEGIN, END, FAIL, REQUEUE, ALL.  See documentation for others)
+#SBATCH --output=/home/%u/output/output-%x-%j.log
+#SBATCH --error=/home/%u/output/error-%x-%j.log
+
+
+module purge
+module load python
+
+# First command
+# python3 get_original_file_info.py -i ukb44534_compiled_tab-001.zip -o odfi --del $'\t'
+
+# Second command with arguments passed from the command line
+# python3 create_sets.py -i ukb44534_compiled_tab-001.zip --odfi odfi.pickle --trc 5 --vrc 1 --cc 22938 --cn 1 --oc 2 --sc 1 --tp 0.8 --del $'\t'
+
+feature_names_path="ukb44534_compiled_fields.csv"
+case_id=1
+target_id=2
+delimiters=",|"
+
+# The following code is to find out longitunidal data.
+# Number of datasets to process (change this if the number of datasets changes)
+num_datasets=5
+
+# Loop over each dataset
+for i in $(seq 1 $num_datasets); do
+    # Generate dynamic file names based on pattern
+    data_path="training-set-${i}.csv"
+    ordinals_path="validation-set-${i}-column-ordinals"
+    output_file="longitudinal_columns_${i}.csv"
+    longitudinal_output_path="longitudinal_output_${i}.csv"
+    non_longitudinal_output_path="non_longitudinal_output_${i}.csv"
+    
+    echo "Processing $data_path with ordinals $ordinals_path, saving results to $output_file..."
+    
+    # Run the Python script for each dataset
+    python preprocess.py "$data_path" "$feature_names_path" "$ordinals_path" "$case_id" "$target_id"  --longitudinal_output "$longitudinal_output_path" --non_longitudinal_output "$non_longitudinal_output_path"
+
+    echo "Finished processing $data_path. Results saved in $output_file."
+done
+
+echo "All datasets processed."
